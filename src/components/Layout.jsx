@@ -1,8 +1,8 @@
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Zap, Car } from 'lucide-react'
 
-export default function Layout({ children }) {
+export default function Layout() {
   const loc = useLocation()
   const isActive = (path) => {
     if (path === '/') return loc.pathname === '/'
@@ -19,7 +19,7 @@ export default function Layout({ children }) {
 
       {/* Content */}
       <main className="flex-1 p-4 pb-20">
-        {children}
+        <Outlet />
       </main>
 
       {/* Bottom Nav */}
