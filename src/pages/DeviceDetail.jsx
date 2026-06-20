@@ -58,6 +58,7 @@ export default function DeviceDetail() {
       currentStart = null
     }
   }
+  sessions.reverse()
 
   const totalEnergy = sessions.reduce((s, sess) => s + sess.energy, 0)
   const totalDuration = sessions.reduce((s, sess) => s + sess.duration, 0)
@@ -76,82 +77,82 @@ export default function DeviceDetail() {
   return (
     <div className="space-y-4">
       {/* Back */}
-      <Link to="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+      <Link to="/" className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
         <ArrowLeft className="w-5 h-5" />
         <span className="text-sm">Voltar</span>
       </Link>
 
       {/* Title */}
-      <h1 className="text-2xl font-bold text-white">{decodedName}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{decodedName}</h1>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="w-4 h-4 text-yellow-500" />
-            <span className="text-xs text-gray-500">Potência Média</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Potência Média</span>
           </div>
-          <p className="text-xl font-bold text-white">{avgPower.toFixed(0)} W</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{avgPower.toFixed(0)} W</p>
         </div>
-        <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <Activity className="w-4 h-4 text-green-500" />
-            <span className="text-xs text-gray-500">Sessões</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Sessões</span>
           </div>
-          <p className="text-xl font-bold text-white">{sessions.length}</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{sessions.length}</p>
         </div>
-        <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-blue-500" />
-            <span className="text-xs text-gray-500">Tempo Total</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Tempo Total</span>
           </div>
-          <p className="text-xl font-bold text-white">{formatDuration(totalDuration)}</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{formatDuration(totalDuration)}</p>
         </div>
-        <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-purple-500" />
-            <span className="text-xs text-gray-500">Energia Total</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Energia Total</span>
           </div>
-          <p className="text-xl font-bold text-white">{formatEnergy(totalEnergy)}</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{formatEnergy(totalEnergy)}</p>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-900/30 border border-red-800 rounded-xl p-3 text-red-400 text-sm">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-3 text-red-600 dark:text-red-400 text-sm">
           ⚠️ {error}
         </div>
       )}
 
       {/* Sessions */}
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+      <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
         Sessões ({sessions.length})
       </h2>
 
       <div className="space-y-2">
         {sessions.slice(0, 20).map((session, i) => (
-          <div key={i} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+          <div key={i} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-white">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {new Date(session.start.created_at).toLocaleDateString('pt-PT', {
                   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                 })}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
                 {new Date(session.stop.created_at).toLocaleTimeString('pt-PT')}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="text-xs text-gray-500">Duração</p>
-                <p className="text-sm font-semibold text-white">{formatDuration(session.duration)}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Duração</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatDuration(session.duration)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Energia</p>
-                <p className="text-sm font-semibold text-white">{formatEnergy(session.energy)}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Energia</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatEnergy(session.energy)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Potência</p>
-                <p className="text-sm font-semibold text-white">
+                <p className="text-xs text-gray-400 dark:text-gray-500">Potência</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
                   {session.duration > 0
                     ? `${((session.energy / session.duration) * 3600).toFixed(0)} W`
                     : '—'}
@@ -161,7 +162,7 @@ export default function DeviceDetail() {
           </div>
         ))}
         {sessions.length === 0 && (
-          <p className="text-center text-gray-500 py-8 text-sm">Sem sessões registadas</p>
+          <p className="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">Sem sessões registadas</p>
         )}
       </div>
     </div>
