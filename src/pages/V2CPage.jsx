@@ -125,7 +125,7 @@ export default function V2CPage() {
             </div>
             <div className="bg-white/20 rounded-xl p-3 text-center backdrop-blur-sm">
               <Battery className="w-5 h-5 mx-auto mb-1 text-blue-200" />
-              <p className="text-2xl font-bold">{formatEnergy((activeSession.total_energy_wh || 0) * 1000)}</p>
+              <p className="text-2xl font-bold">{((activeSession.total_energy_wh || 0)).toFixed(2) + " kWh"}</p>
               <p className="text-xs text-white/70">Energia</p>
             </div>
             <div className="bg-white/20 rounded-xl p-3 text-center backdrop-blur-sm">
@@ -165,7 +165,7 @@ export default function V2CPage() {
               <Battery className="w-4 h-4 text-green-500" />
               <span className="text-xs text-gray-400 dark:text-gray-500">Energia Total</span>
             </div>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">{formatEnergy((stats.totalEnergyWh || 0) * 1000)}</p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">{(stats.totalEnergyWh || 0).toFixed(2) + " kWh"}</p>
           </div>
           <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2 mb-2">
@@ -214,7 +214,7 @@ export default function V2CPage() {
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 dark:text-gray-500">Energia</p>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatEnergy((snap.energy || 0) * 1000)}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{((snap.energy || 0)).toFixed(2) + " kWh"}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 dark:text-gray-500">Casa</p>
@@ -251,7 +251,7 @@ export default function V2CPage() {
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">Energia</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatEnergy((session.total_energy_wh || 0) * 1000)}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{(session.total_energy_wh || 0).toFixed(2) + " kWh"}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">Duração</p>
