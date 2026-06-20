@@ -30,8 +30,8 @@ export default function V2CPage() {
           getV2CSessions(20),
           getV2CStats(),
         ])
-        setSessions(sessData)
-        setStats(statsData)
+        setSessions(sessData); console.log("[V2C] Sessions loaded:", sessData.length, sessData)
+        setStats(statsData); console.log("[V2C] Stats loaded:", statsData)
       } catch (err) {
         setError(err.message)
       } finally {

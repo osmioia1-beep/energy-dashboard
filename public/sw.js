@@ -1,4 +1,4 @@
-const CACHE_NAME = 'energy-dashboard-v1';
+const CACHE_NAME = 'energy-dashboard-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
