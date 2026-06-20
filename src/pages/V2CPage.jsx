@@ -94,7 +94,7 @@ export default function V2CPage() {
               <TrendingUp className="w-4 h-4 text-purple-500" />
               <span className="text-xs text-gray-400 dark:text-gray-500">Potência Média</span>
             </div>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.avgPower.toFixed(0)} W</p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">{(stats.avgPower || 0).toFixed(0)} W</p>
           </div>
         </div>
       )}
