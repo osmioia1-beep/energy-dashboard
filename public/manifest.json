@@ -2,7 +2,7 @@
   "name": "Energy Dashboard",
   "short_name": "Energy",
   "description": "Monitorização de energia Shelly",
-  "start_url": "/",
+  "start_url": "https://energy-dashboard-4cp8.onrender.com/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#22c55e",
