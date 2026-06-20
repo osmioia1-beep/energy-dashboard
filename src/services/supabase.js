@@ -86,7 +86,7 @@ export async function getDeviceStats(name) {
     lastPower: lastEvent.power_watts || 0,
     lastVoltage: lastEvent.voltage || 0,
     lastEnergy: lastEvent.total_energy_wh || 0,
-    isOn: lastEvent.event_type === 'start' || lastEvent.event_type === 'on',
+    isOn: (lastEvent.event_type === 'start' || lastEvent.event_type === 'on') && (lastEvent.power_watts || 0) > 10,
   }
 }
 
