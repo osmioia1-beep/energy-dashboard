@@ -106,7 +106,7 @@ export default function V2CPage() {
 
       {/* Active Session Card */}
       {activeSession && (
-        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg">
+        <div className="bg-gradient-to-br from-green-600/90 to-teal-600/90 rounded-2xl p-5 text-white shadow-md">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Car className="w-5 h-5" />
@@ -118,22 +118,22 @@ export default function V2CPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur-sm">
+            <div className="bg-white/20 rounded-xl p-3 text-center backdrop-blur-sm">
               <Zap className="w-5 h-5 mx-auto mb-1 text-yellow-300" />
               <p className="text-2xl font-bold">{activeSession.avg_power_watts?.toFixed(0) || '—'}</p>
               <p className="text-xs text-white/70">Watts (média)</p>
             </div>
-            <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur-sm">
+            <div className="bg-white/20 rounded-xl p-3 text-center backdrop-blur-sm">
               <Battery className="w-5 h-5 mx-auto mb-1 text-blue-200" />
               <p className="text-2xl font-bold">{formatEnergy(activeSession.total_energy_wh)}</p>
               <p className="text-xs text-white/70">Energia</p>
             </div>
-            <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur-sm">
+            <div className="bg-white/20 rounded-xl p-3 text-center backdrop-blur-sm">
               <Clock className="w-5 h-5 mx-auto mb-1 text-purple-200" />
               <p className="text-2xl font-bold">{formatDuration(currentDuration)}</p>
               <p className="text-xs text-white/70">Duração</p>
             </div>
-            <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur-sm">
+            <div className="bg-white/20 rounded-xl p-3 text-center backdrop-blur-sm">
               <Activity className="w-5 h-5 mx-auto mb-1 text-orange-200" />
               <p className="text-2xl font-bold">{activeSnapshots.length}</p>
               <p className="text-xs text-white/70">Snapshots</p>
@@ -142,7 +142,7 @@ export default function V2CPage() {
 
           {/* Max power */}
           {activeSession.max_power_watts > 0 && (
-            <div className="bg-white/10 rounded-lg p-2 text-center">
+            <div className="bg-white/20 rounded-lg p-2 text-center">
               <p className="text-xs text-white/60">Potência Máxima</p>
               <p className="text-lg font-bold text-yellow-300">{activeSession.max_power_watts.toFixed(0)} W</p>
             </div>
