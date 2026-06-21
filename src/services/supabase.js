@@ -23,20 +23,14 @@ async function supabaseFetch(path, options = {}) {
 // ── Shelly Events ──────────────────────────────────────────────
 
 export async function getDevices() {
-  // Fetch up to 500 events to find all unique device names
-  const data = await supabaseFetch(
-    'shelly_events?select=shelly_name,shelly_ip&order=created_at.desc&limit=500'
-  )
-  const devices = {}
-  for (const row of data) {
-    if (row.shelly_name && !devices[row.shelly_name]) {
-      devices[row.shelly_name] = {
-        name: row.shelly_name,
-        ip: row.shelly_ip,
-      }
-    }
-  }
-  return Object.values(devices)
+  // Use the device_list view for unique device names
+  const data = await supabaseFetch('device_list?select=*')
+  return data
+    .filter(row => row.shelly_name)
+    .map(row => ({
+      name: row.shelly_name,
+      ip: row.shelly_ip,
+    }))
 }
 
 export async function getLatestEvents(limit = 50) {
