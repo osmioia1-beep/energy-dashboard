@@ -23,8 +23,9 @@ async function supabaseFetch(path, options = {}) {
 // ── Shelly Events ──────────────────────────────────────────────
 
 export async function getDevices() {
+  // Fetch up to 500 events to find all unique device names
   const data = await supabaseFetch(
-    'shelly_events?select=shelly_name,shelly_ip&order=created_at.desc&limit=100'
+    'shelly_events?select=shelly_name,shelly_ip&order=created_at.desc&limit=500'
   )
   const devices = {}
   for (const row of data) {
