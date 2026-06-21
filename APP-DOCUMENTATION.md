@@ -583,24 +583,22 @@ energy-dashboard/
 
 ## 8. Bugs Conhecidos e Incongruências
 
-### 8.1 Eventos Falsos Positivos na BD
-**Problema:** A BD contém centenas de eventos `start` com `power_watts < 10W` inseridos antes da correção do filtro de falsos positivos no servidor.
-**Impacto:** Distorcia estatísticas e pode fazer dispositivos aparecerem como "Ligados".
-**Mitigação atual:** Filtro no frontend (ignora `start` com `< 10W`).
-**Solução ideal:** Limpar os eventos falsos positivos da BD com SQL.
+### 8.1 ~~Eventos Falsos Positivos na BD~~ ✅ CORRIGIDO
+**Problema:** A BD continha ~230 eventos `start` com `power_watts < 10W` inseridos antes da correção do filtro de falsos positivos no servidor.
+**Resolução:** Eventos eliminados da BD (2026-06-21). O filtro no servidor impede novos falsos positivos. O frontend também filtra como salvaguarda.
 
 ### 8.2 Nome do Campo `total_energy_wh` no V2C
 **Problema:** O campo `total_energy_wh` na tabela `v2c_charging_sessions` armazena valores em **kWh** (não Wh).
 **Impacto:** Confusão semântica. O frontend trata corretamente como kWh.
 **Nota:** O campo `ChargeEnergy` da API V2C retorna kWh diretamente.
 
-### 8.3 `getLatestEvents` Não Filtra Falsos Positivos
-**Problema:** A função `getLatestEvents()` (usada na lista de eventos recentes do Dashboard) não filtra falsos positivos.
-**Impacto:** Eventos falsos positivos podem aparecer na lista de "Eventos Recentes".
+### 8.3 ~~`getLatestEvents` Não Filtra Falsos Positivos~~ ✅ CORRIGIDO
+**Problema:** A função `getLatestEvents()` (usada na lista de eventos recentes do Dashboard) não filtrava falsos positivos.
+**Resolução:** Adicionado filtro no frontend (2026-06-21).
 
-### 8.4 `getDailyEnergy` Não Filtra Falsos Positivos
-**Problema:** A função `getDailyEnergy()` usa todos os eventos, incluindo falsos positivos.
-**Impacto:** Cálculo de energia diária pode estar incorreto se houver falsos positivos.
+### 8.4 ~~`getDailyEnergy` Não Filtra Falsos Positivos~~ ✅ CORRIGIDO
+**Problema:** A função `getDailyEnergy()` usava todos os eventos, incluindo falsos positivos.
+**Resolução:** Adicionado filtro no frontend (2026-06-21).
 
 ### 8.5 Duplicação de Código nos Servidores
 **Problema:** Os 4 servidores Shelly partilham ~90% do código (funções `supabaseInsert`, `supabaseQuery`, `sendTelegram`, `logEvent`, `confirmStateChange`, `handleWebhook`, `checkAlerts`).
@@ -608,13 +606,12 @@ energy-dashboard/
 **Solução ideal:** Extrair código comum para um módulo partilhado.
 
 ### 8.6 Threshold de Confirmação Duplicado no PM Mini
-**Problema:** Nos servidores `server-maqlavar.js` e `server-maqsecar.js`, o `CONFIRM_THRESHOLD` é igual ao `POWER_THRESHOLD` (50W). Isto significa que um `start` só é confirmado se a potência for >= 50W, mas o webhook do Shelly é configurado para disparar com o mesmo threshold.
+**Problema:** Nos servidores `server-maqlavar.js` e `server-maqsecar.js`, o `CONFIRM_THRESHOLD` é igual ao `POWER_THRESHOLD` (50W).
 **Impacto:** Funciona corretamente, mas é redundante — o webhook já garante que a potência é >= 50W.
 
-### 8.7 `reactive_power` Não é Inserido para Piscina/Lavar/Secar
-**Problema:** O servidor Furo insere `reactive_power` na BD, mas os servidores Piscina, Lavar e Secar não.
-**Impacto:** Campo `reactive_power` é NULL para todos os dispositivos exceto Furo.
-**Nota:** Os Shelly Plus Plug S e PM Mini Gen 3 não fornecem potência reativa.
+### 8.7 ~~`reactive_power` Não é Inserido para Piscina/Lavar/Secar~~ ✅ CORRIGIDO
+**Problema:** O servidor Furo inseria `reactive_power` na BD, mas os servidores Piscina, Lavar e Secar não.
+**Resolução:** Adicionado `reactive_power: null` explicitamente nos 3 servidores (2026-06-21). O campo será NULL para dispositivos que não fornecem potência reativa.
 
 ### 8.8 `lastAlertTime` Não Persiste
 **Problema:** O timer de cooldown de alertas (`lastAlertTime`) é variável em memória.
@@ -624,10 +621,9 @@ energy-dashboard/
 **Problema:** Quando o timeout de seleção de carro expira (5 min), o servidor assume "Desconhecido" e inicia a sessão. Se o utilizador selecionar o carro depois, a mensagem é ignorada mas o `carSelectTimer` já foi limpo.
 **Impacto:** Funcionalmente correto, mas a experiência pode ser confusa.
 
-### 8.10 `getDeviceStats` Pode Retornar `null` Após Filtragem
-**Problema:** Se todos os eventos de um dispositivo forem falsos positivos, `filtered` será vazio e `filtered[0]` será `undefined`.
-**Impacto:** `lastEvent` será `undefined`, causando erro no acesso a `lastEvent.power_watts`.
-**Mitigação:** Improvável na prática (dispositivos reais têm eventos legítimos).
+### 8.10 ~~`getDeviceStats` Pode Retornar `null` Após Filtragem~~ ✅ CORRIGIDO
+**Problema:** Se todos os eventos de um dispositivo fossem falsos positivos, `filtered` seria vazio e `filtered[0]` seria `undefined`, causando crash.
+**Resolução:** Adicionada verificação `if (filtered.length === 0) return null` (2026-06-21).
 
 ---
 
