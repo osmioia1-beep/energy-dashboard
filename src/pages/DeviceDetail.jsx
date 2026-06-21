@@ -224,7 +224,7 @@ export default function DeviceDetail() {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {new Date(session.start.created_at).toLocaleDateString('pt-PT', {
-                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
                   })}
                 </span>
                 {session.active && (
