@@ -56,9 +56,24 @@ export default function DeviceDetail() {
         energy: energyDiff < 10000 ? energyDiff : 0,
         startTime: new Date(currentStart.created_at),
         stopTime: new Date(event.created_at),
+        active: false,
       })
       currentStart = null
     }
+  }
+  // If there's an unpaired start, the device is currently running
+  if (currentStart) {
+    const now = new Date()
+    const duration = (now - new Date(currentStart.created_at)) / 1000
+    sessions.push({
+      start: currentStart,
+      stop: null,
+      duration,
+      energy: 0,
+      startTime: new Date(currentStart.created_at),
+      stopTime: now,
+      active: true,
+    })
   }
   sessions.reverse()
 
@@ -176,15 +191,22 @@ export default function DeviceDetail() {
 
       <div className="space-y-2">
         {sessions.slice(0, 20).map((session, i) => (
-          <div key={i} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
+          <div key={i} className={`rounded-xl p-4 border ${session.active ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'}`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {new Date(session.start.created_at).toLocaleDateString('pt-PT', {
-                  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                })}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {new Date(session.start.created_at).toLocaleDateString('pt-PT', {
+                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                  })}
+                </span>
+                {session.active && (
+                  <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-semibold animate-pulse">
+                    EM CURSO
+                  </span>
+                )}
+              </div>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {new Date(session.stop.created_at).toLocaleTimeString('pt-PT')}
+                {session.stop ? new Date(session.stop.created_at).toLocaleTimeString('pt-PT') : 'agora'}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -194,14 +216,18 @@ export default function DeviceDetail() {
               </div>
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">Energia</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatEnergy(session.energy)}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {session.active ? '—' : formatEnergy(session.energy)}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">Potência</p>
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {session.duration > 0
-                    ? `${((session.energy / session.duration) * 3600).toFixed(0)} W`
-                    : '—'}
+                  {session.active
+                    ? `${session.start.power_watts?.toFixed(0) || '—'} W`
+                    : session.duration > 0
+                      ? `${((session.energy / session.duration) * 3600).toFixed(0)} W`
+                      : '—'}
                 </p>
               </div>
             </div>
