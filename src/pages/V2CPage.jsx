@@ -19,9 +19,10 @@ function formatEnergy(wh) {
   return `${wh.toFixed(1)} Wh`
 }
 
-function formatTime(iso) {
+function formatSnapshotTime(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }) + ' ' +
+    new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function formatDate(iso) {
@@ -201,7 +202,7 @@ export default function V2CPage() {
               <div key={i} className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {formatTime(snap.time)}
+                    {formatSnapshotTime(snap.time)}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">
                     #{activeSnapshots.length - i}
