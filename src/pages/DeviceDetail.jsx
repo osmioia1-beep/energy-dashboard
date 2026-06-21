@@ -40,7 +40,7 @@ export default function DeviceDetail() {
     return () => clearInterval(interval)
   }, [decodedName])
 
-  // Pair start/stop events
+  // Pair start/stop events into sessions
   const sessions = []
   let currentStart = null
   for (const event of [...events].reverse()) {
@@ -54,17 +54,35 @@ export default function DeviceDetail() {
         stop: event,
         duration,
         energy: energyDiff < 10000 ? energyDiff : 0,
+        startTime: new Date(currentStart.created_at),
+        stopTime: new Date(event.created_at),
       })
       currentStart = null
     }
   }
   sessions.reverse()
 
-  const totalEnergy = sessions.reduce((s, sess) => s + sess.energy, 0)
-  const totalDuration = sessions.reduce((s, sess) => s + sess.duration, 0)
-  const avgPower = events.length > 0
-    ? events.reduce((s, e) => s + (e.power_watts || 0), 0) / events.length
-    : 0
+  // Compute stats for a date range
+  const now = new Date()
+  const oneHourAgo = new Date(now - 3600 * 1000)
+  const twoHoursAgo = new Date(now - 2 * 3600 * 1000)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  const statsForRange = (fromDate, toDate) => {
+    const filtered = sessions.filter(s => s.startTime >= fromDate && s.startTime < toDate)
+    const count = filtered.length
+    const duration = filtered.reduce((s, sess) => s + sess.duration, 0)
+    const energy = filtered.reduce((s, sess) => s + sess.energy, 0)
+    const avgP = count > 0
+      ? filtered.reduce((s, sess) => s + (sess.duration > 0 ? (sess.energy / sess.duration) * 3600 : 0), 0) / count
+      : 0
+    return { count, duration, energy, avgPower: avgP }
+  }
+
+  const stats1h = statsForRange(oneHourAgo, now)
+  const stats2h = statsForRange(twoHoursAgo, now)
+  const statsToday = statsForRange(todayStart, now)
+  const statsTotal = statsForRange(new Date(0), now)
 
   if (loading) {
     return (
@@ -85,35 +103,63 @@ export default function DeviceDetail() {
       {/* Title */}
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{decodedName}</h1>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Zap className="w-4 h-4 text-yellow-500" />
-            <span className="text-xs text-gray-400 dark:text-gray-500">Potência Média</span>
-          </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">{avgPower.toFixed(0)} W</p>
+      {/* Stats Grid — 4 periods × 4 metrics */}
+      <div className="space-y-3">
+        {/* Header */}
+        <div className="grid grid-cols-5 gap-2 text-xs text-gray-400 dark:text-gray-500 px-1">
+          <div className="col-span-1" />
+          <div className="text-center font-semibold">1h</div>
+          <div className="text-center font-semibold">2h</div>
+          <div className="text-center font-semibold">Hoje</div>
+          <div className="text-center font-semibold">Total</div>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="w-4 h-4 text-green-500" />
-            <span className="text-xs text-gray-400 dark:text-gray-500">Sessões</span>
+
+        {/* Arranques */}
+        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2 col-span-1">
+            <Activity className="w-4 h-4 text-green-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Arranques</span>
           </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">{sessions.length}</p>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats1h.count}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats2h.count}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsToday.count}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsTotal.count}</div>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-blue-500" />
-            <span className="text-xs text-gray-400 dark:text-gray-500">Tempo Total</span>
+
+        {/* Tempo Ligado */}
+        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2 col-span-1">
+            <Clock className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Tempo</span>
           </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">{formatDuration(totalDuration)}</p>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(stats1h.duration)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(stats2h.duration)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(statsToday.duration)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(statsTotal.duration)}</div>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-purple-500" />
-            <span className="text-xs text-gray-400 dark:text-gray-500">Energia Total</span>
+
+        {/* Energia */}
+        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2 col-span-1">
+            <TrendingUp className="w-4 h-4 text-purple-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Energia</span>
           </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">{formatEnergy(totalEnergy)}</p>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(stats1h.energy)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(stats2h.energy)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(statsToday.energy)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(statsTotal.energy)}</div>
+        </div>
+
+        {/* Potência Média */}
+        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2 col-span-1">
+            <Zap className="w-4 h-4 text-yellow-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Pot. Média</span>
+          </div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats1h.avgPower.toFixed(0)} W</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats2h.avgPower.toFixed(0)} W</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsToday.avgPower.toFixed(0)} W</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsTotal.avgPower.toFixed(0)} W</div>
         </div>
       </div>
 
