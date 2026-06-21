@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Zap, Clock, TrendingUp, Activity } from 'lucide-react'
-import { getDeviceEvents } from '../services/supabase'
+import { getDeviceEvents, getAllDeviceEvents } from '../services/supabase'
 
 function formatDuration(seconds) {
   if (!seconds) return '—'
@@ -24,11 +24,17 @@ export default function DeviceDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const [allEvents, setAllEvents] = useState([])
+
   useEffect(() => {
     async function load() {
       try {
+        // Load limited events for the sessions list
         const data = await getDeviceEvents(decodedName, 100)
         setEvents(data)
+        // Load ALL events for accurate statistics
+        const allData = await getAllDeviceEvents(decodedName)
+        setAllEvents(allData)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -46,42 +52,57 @@ export default function DeviceDetail() {
     return true;
   });
 
-  // Pair start/stop events into sessions
-  const sessions = []
-  let currentStart = null
-  for (const event of [...filteredEvents].reverse()) {
-    if (event.event_type === 'start' || event.event_type === 'on') {
-      currentStart = event
-    } else if ((event.event_type === 'stop' || event.event_type === 'off') && currentStart) {
-      const duration = (new Date(event.created_at) - new Date(currentStart.created_at)) / 1000
-      const energyDiff = Math.abs((event.total_energy_wh || 0) - (currentStart.total_energy_wh || 0))
+  // Use ALL events for statistics (accurate totals)
+  const allFilteredEvents = allEvents.filter(e => {
+    if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
+    return true;
+  });
+
+  // Pair start/stop events into sessions (helper function)
+  function pairSessions(events) {
+    const sessions = []
+    let currentStart = null
+    for (const event of [...events].reverse()) {
+      if (event.event_type === 'start' || event.event_type === 'on') {
+        currentStart = event
+      } else if ((event.event_type === 'stop' || event.event_type === 'off') && currentStart) {
+        const duration = (new Date(event.created_at) - new Date(currentStart.created_at)) / 1000
+        const energyDiff = Math.abs((event.total_energy_wh || 0) - (currentStart.total_energy_wh || 0))
+        sessions.push({
+          start: currentStart,
+          stop: event,
+          duration,
+          energy: energyDiff < 10000 ? energyDiff : 0,
+          startTime: new Date(currentStart.created_at),
+          stopTime: new Date(event.created_at),
+          active: false,
+        })
+        currentStart = null
+      }
+    }
+    // If there's an unpaired start, the device is currently running
+    if (currentStart) {
+      const now = new Date()
+      const duration = (now - new Date(currentStart.created_at)) / 1000
       sessions.push({
         start: currentStart,
-        stop: event,
+        stop: null,
         duration,
-        energy: energyDiff < 10000 ? energyDiff : 0,
+        energy: 0,
         startTime: new Date(currentStart.created_at),
-        stopTime: new Date(event.created_at),
-        active: false,
+        stopTime: now,
+        active: true,
       })
-      currentStart = null
     }
+    sessions.reverse()
+    return sessions
   }
-  // If there's an unpaired start, the device is currently running
-  if (currentStart) {
-    const now = new Date()
-    const duration = (now - new Date(currentStart.created_at)) / 1000
-    sessions.push({
-      start: currentStart,
-      stop: null,
-      duration,
-      energy: 0,
-      startTime: new Date(currentStart.created_at),
-      stopTime: now,
-      active: true,
-    })
-  }
-  sessions.reverse()
+
+  // Sessions for the list (limited to 100 events)
+  const sessions = pairSessions(filteredEvents)
+
+  // Sessions for statistics (ALL events — accurate)
+  const statsSessions = pairSessions(allFilteredEvents)
 
   // Compute stats for a date range
   const now = new Date()
@@ -90,7 +111,8 @@ export default function DeviceDetail() {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
   const statsForRange = (fromDate, toDate) => {
-    const filtered = sessions.filter(s => s.startTime >= fromDate && s.startTime < toDate)
+    // Use statsSessions (ALL events) for accurate statistics
+    const filtered = statsSessions.filter(s => s.startTime >= fromDate && s.startTime < toDate)
     const count = filtered.length
     const duration = filtered.reduce((s, sess) => s + sess.duration, 0)
     const energy = filtered.reduce((s, sess) => s + sess.energy, 0)

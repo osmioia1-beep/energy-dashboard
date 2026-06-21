@@ -50,10 +50,16 @@ export async function getDeviceEvents(name, limit = 100) {
   )
 }
 
-export async function getDeviceStats(name) {
-  const events = await supabaseFetch(
-    `shelly_events?shelly_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=200`
+// Get ALL events for a device (no limit) — used for statistics
+export async function getAllDeviceEvents(name) {
+  return supabaseFetch(
+    `shelly_events?shelly_name=eq.${encodeURIComponent(name)}&order=created_at.desc`
   )
+}
+
+export async function getDeviceStats(name) {
+  // Fetch ALL events for accurate statistics (no limit)
+  const events = await getAllDeviceEvents(name)
   if (events.length === 0) {
     console.warn(`getDeviceStats: no events for "${name}"`)
     return null
@@ -150,8 +156,9 @@ export async function getV2CSessions(limit = 20) {
 }
 
 export async function getV2CStats() {
+  // Fetch ALL sessions for accurate statistics (no limit)
   const sessions = await supabaseFetch(
-    'v2c_charging_sessions?select=total_energy_wh,duration_seconds,avg_power_watts,carro&order=start_time.desc&limit=100'
+    'v2c_charging_sessions?select=total_energy_wh,duration_seconds,avg_power_watts,carro&order=start_time.desc'
   )
   if (sessions.length === 0) return null
 
