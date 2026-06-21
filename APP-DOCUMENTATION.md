@@ -609,21 +609,16 @@ energy-dashboard/
 **Problema:** Nos servidores `server-maqlavar.js` e `server-maqsecar.js`, o `CONFIRM_THRESHOLD` é igual ao `POWER_THRESHOLD` (50W).
 **Impacto:** Funciona corretamente, mas é redundante — o webhook já garante que a potência é >= 50W.
 
-### 8.7 ~~`reactive_power` Não é Inserido para Piscina/Lavar/Secar~~ ✅ CORRIGIDO
-**Problema:** O servidor Furo inseria `reactive_power` na BD, mas os servidores Piscina, Lavar e Secar não.
-**Resolução:** Adicionado `reactive_power: null` explicitamente nos 3 servidores (2026-06-21). O campo será NULL para dispositivos que não fornecem potência reativa.
-
-### 8.8 `lastAlertTime` Não Persiste
+### 8.7 `lastAlertTime` Não Persiste
 **Problema:** O timer de cooldown de alertas (`lastAlertTime`) é variável em memória.
 **Impacto:** Se o servidor for reiniciado, o cooldown é perdido e um alerta pode ser enviado imediatamente.
 
-### 8.9 Timeout de Carro V2C Não Cancela Polling
-**Problema:** Quando o timeout de seleção de carro expira (5 min), o servidor assume "Desconhecido" e inicia a sessão. Se o utilizador selecionar o carro depois, a mensagem é ignorada mas o `carSelectTimer` já foi limpo.
-**Impacto:** Funcionalmente correto, mas a experiência pode ser confusa.
+### 8.8 ~~Timeout de Carro V2C Não Cancela Polling~~ ✅ CORRIGIDO (2026-06-21)
+**Problema:** Quando o timeout de seleção de carro expirava (5 min), o servidor assumia "Desconhecido" e iniciava a sessão. Se o utilizador selecionasse o carro depois, a mensagem era ignorada.
+**Resolução:** Agora permite atualizar o carro mesmo com sessão ativa. Se clicar num botão sem carregamento em curso, recebe mensagem informativa.
 
-### 8.10 ~~`getDeviceStats` Pode Retornar `null` Após Filtragem~~ ✅ CORRIGIDO
-**Problema:** Se todos os eventos de um dispositivo fossem falsos positivos, `filtered` seria vazio e `filtered[0]` seria `undefined`, causando crash.
-**Resolução:** Adicionada verificação `if (filtered.length === 0) return null` (2026-06-21).
+### 8.9 Limpeza de BD (2026-06-21)
+**Ação:** Eliminados 141 eventos `shelly_events` e 3 sessões `v2c_charging_sessions` que continham falsos positivos e dados dessincronizados. A BD foi limpa para começar de novo com dados corretos.
 
 ---
 
