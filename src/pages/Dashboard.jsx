@@ -13,12 +13,6 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const { register } = useRefresh()
 
-  useEffect(() => {
-    if (register) {
-      return register(loadData)
-    }
-  }, [register, loadData])
-
   const loadData = useCallback(async () => {
     try {
       setError(null)
@@ -44,6 +38,12 @@ export default function Dashboard() {
       setRefreshing(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (register) {
+      return register(loadData)
+    }
+  }, [register, loadData])
 
   useEffect(() => {
     loadData()
