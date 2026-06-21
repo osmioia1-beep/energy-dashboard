@@ -3,17 +3,17 @@ import { Link } from 'react-router-dom'
 import { Activity, Zap, Clock, TrendingUp, ChevronRight } from 'lucide-react'
 
 const DEVICE_ICONS = {
-  'Furo': '💧',
+  'Bomba Furo': '💧',
   'Piscina': '🏊',
-  'Máq. Lavar': '🧺',
+  'Maq. Lavar Roupa': '🧺',
   'Máq. Secar': '🌀',
   'Carregador': '⚡',
 }
 
 const DEVICE_COLORS = {
-  'Furo': 'from-blue-600 to-blue-800',
+  'Bomba Furo': 'from-blue-600 to-blue-800',
   'Piscina': 'from-cyan-600 to-cyan-800',
-  'Máq. Lavar': 'from-purple-600 to-purple-800',
+  'Maq. Lavar Roupa': 'from-purple-600 to-purple-800',
   'Máq. Secar': 'from-orange-600 to-orange-800',
   'Carregador': 'from-green-600 to-green-800',
 }

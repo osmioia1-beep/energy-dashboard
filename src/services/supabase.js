@@ -49,7 +49,11 @@ export async function getDeviceStats(name) {
   const events = await supabaseFetch(
     `shelly_events?shelly_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=200`
   )
-  if (events.length === 0) return null
+  if (events.length === 0) {
+    console.warn(`getDeviceStats: no events for "${name}"`)
+    return null
+  }
+  console.log(`getDeviceStats: ${events.length} events for "${name}", last: ${events[0]?.event_type} @ ${events[0]?.power_watts}W`)
 
   const powerOn = events.filter(e => e.event_type === 'start' || e.event_type === 'on')
   const powerOff = events.filter(e => e.event_type === 'stop' || e.event_type === 'off')
