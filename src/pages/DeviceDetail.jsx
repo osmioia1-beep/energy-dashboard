@@ -65,7 +65,7 @@ export default function DeviceDetail() {
   // Compute stats for a date range
   const now = new Date()
   const oneHourAgo = new Date(now - 3600 * 1000)
-  const twoHoursAgo = new Date(now - 2 * 3600 * 1000)
+  const twentyFourHoursAgo = new Date(now - 24 * 3600 * 1000)
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
   const statsForRange = (fromDate, toDate) => {
@@ -80,7 +80,7 @@ export default function DeviceDetail() {
   }
 
   const stats1h = statsForRange(oneHourAgo, now)
-  const stats2h = statsForRange(twoHoursAgo, now)
+  const stats24h = statsForRange(twentyFourHoursAgo, now)
   const statsToday = statsForRange(todayStart, now)
   const statsTotal = statsForRange(new Date(0), now)
 
@@ -103,62 +103,62 @@ export default function DeviceDetail() {
       {/* Title */}
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{decodedName}</h1>
 
-      {/* Stats Grid — 4 periods × 4 metrics */}
-      <div className="space-y-3">
+      {/* Stats Grid — periods as rows, metrics as columns */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
         {/* Header */}
-        <div className="grid grid-cols-5 gap-2 text-xs text-gray-400 dark:text-gray-500 px-1">
-          <div className="col-span-1" />
-          <div className="text-center font-semibold">1h</div>
-          <div className="text-center font-semibold">2h</div>
-          <div className="text-center font-semibold">Hoje</div>
-          <div className="text-center font-semibold">Total</div>
+        <div className="grid grid-cols-5 gap-2 p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+          <div className="text-xs font-semibold text-gray-400 dark:text-gray-500" />
+          <div className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400">Arranques</div>
+          <div className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400">Tempo</div>
+          <div className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400">Energia</div>
+          <div className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400">Pot. Média</div>
         </div>
 
-        {/* Arranques */}
-        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 col-span-1">
+        {/* 1h */}
+        <div className="grid grid-cols-5 gap-2 p-3 border-b border-gray-100 dark:border-gray-800 items-center">
+          <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-green-500 shrink-0" />
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Arranques</span>
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">1h</span>
           </div>
           <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats1h.count}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats2h.count}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsToday.count}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsTotal.count}</div>
-        </div>
-
-        {/* Tempo Ligado */}
-        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 col-span-1">
-            <Clock className="w-4 h-4 text-blue-500 shrink-0" />
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Tempo</span>
-          </div>
           <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(stats1h.duration)}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(stats2h.duration)}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(statsToday.duration)}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(statsTotal.duration)}</div>
-        </div>
-
-        {/* Energia */}
-        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 col-span-1">
-            <TrendingUp className="w-4 h-4 text-purple-500 shrink-0" />
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Energia</span>
-          </div>
           <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(stats1h.energy)}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(stats2h.energy)}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(statsToday.energy)}</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(statsTotal.energy)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats1h.avgPower.toFixed(0)} W</div>
         </div>
 
-        {/* Potência Média */}
-        <div className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2 col-span-1">
-            <Zap className="w-4 h-4 text-yellow-500 shrink-0" />
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Pot. Média</span>
+        {/* 24h */}
+        <div className="grid grid-cols-5 gap-2 p-3 border-b border-gray-100 dark:border-gray-800 items-center">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">24h</span>
           </div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats1h.avgPower.toFixed(0)} W</div>
-          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats2h.avgPower.toFixed(0)} W</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats24h.count}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(stats24h.duration)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(stats24h.energy)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{stats24h.avgPower.toFixed(0)} W</div>
+        </div>
+
+        {/* Hoje */}
+        <div className="grid grid-cols-5 gap-2 p-3 border-b border-gray-100 dark:border-gray-800 items-center">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-purple-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Hoje</span>
+          </div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsToday.count}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(statsToday.duration)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(statsToday.energy)}</div>
           <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsToday.avgPower.toFixed(0)} W</div>
+        </div>
+
+        {/* Total */}
+        <div className="grid grid-cols-5 gap-2 p-3 items-center">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-500 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Total</span>
+          </div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsTotal.count}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatDuration(statsTotal.duration)}</div>
+          <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{formatEnergy(statsTotal.energy)}</div>
           <div className="text-center text-sm font-bold text-gray-900 dark:text-white">{statsTotal.avgPower.toFixed(0)} W</div>
         </div>
       </div>
