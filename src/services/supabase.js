@@ -34,9 +34,14 @@ export async function getDevices() {
 }
 
 export async function getLatestEvents(limit = 50) {
-  return supabaseFetch(
+  const data = await supabaseFetch(
     `shelly_events?order=created_at.desc&limit=${limit}`
   )
+  // Filter out false positive events (start events with negligible power)
+  return data.filter(e => {
+    if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
+    return true;
+  })
 }
 
 export async function getDeviceEvents(name, limit = 100) {
@@ -58,6 +63,10 @@ export async function getDeviceStats(name) {
     if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
     return true;
   })
+  if (filtered.length === 0) {
+    console.warn(`getDeviceStats: no valid events for "${name}" after filtering`)
+    return null
+  }
   console.log(`getDeviceStats: ${filtered.length}/${events.length} events for "${name}" (filtered ${events.length - filtered.length} false positives), last: ${filtered[0]?.event_type} @ ${filtered[0]?.power_watts}W`)
 
   const powerOn = filtered.filter(e => e.event_type === 'start' || e.event_type === 'on')
@@ -101,8 +110,14 @@ export async function getDailyEnergy(days = 7) {
     `shelly_events?created_at=gte.${since.toISOString()}&select=shelly_name,total_energy_wh,created_at,event_type&order=created_at.asc`
   )
 
+  // Filter out false positive events (start events with negligible power)
+  const filtered = data.filter(e => {
+    if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
+    return true;
+  })
+
   const daily = {}
-  for (const row of data) {
+  for (const row of filtered) {
     const day = row.created_at?.slice(0, 10)
     if (!day) continue
     if (!daily[day]) daily[day] = {}
