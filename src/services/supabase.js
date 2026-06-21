@@ -53,18 +53,23 @@ export async function getDeviceStats(name) {
     console.warn(`getDeviceStats: no events for "${name}"`)
     return null
   }
-  console.log(`getDeviceStats: ${events.length} events for "${name}", last: ${events[0]?.event_type} @ ${events[0]?.power_watts}W`)
+  // Filter out false positive events (start events with negligible power)
+  const filtered = events.filter(e => {
+    if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
+    return true;
+  })
+  console.log(`getDeviceStats: ${filtered.length}/${events.length} events for "${name}" (filtered ${events.length - filtered.length} false positives), last: ${filtered[0]?.event_type} @ ${filtered[0]?.power_watts}W`)
 
-  const powerOn = events.filter(e => e.event_type === 'start' || e.event_type === 'on')
-  const powerOff = events.filter(e => e.event_type === 'stop' || e.event_type === 'off')
+  const powerOn = filtered.filter(e => e.event_type === 'start' || e.event_type === 'on')
+  const powerOff = filtered.filter(e => e.event_type === 'stop' || e.event_type === 'off')
 
   let totalEnergy = 0
   let totalDuration = 0
-  let lastEvent = events[0]
+  let lastEvent = filtered[0]
 
-  for (let i = 0; i < events.length - 1; i++) {
-    const curr = events[i]
-    const prev = events[i + 1]
+  for (let i = 0; i < filtered.length - 1; i++) {
+    const curr = filtered[i]
+    const prev = filtered[i + 1]
     if (curr.total_energy_wh && prev.total_energy_wh) {
       const diff = Math.abs(curr.total_energy_wh - prev.total_energy_wh)
       if (diff < 10000) totalEnergy += diff
@@ -78,10 +83,10 @@ export async function getDeviceStats(name) {
   return {
     name,
     lastEvent,
-    totalEvents: events.length,
+    totalEvents: filtered.length,
     totalEnergyWh: totalEnergy,
     totalDurationS: totalDuration,
-    avgPower: events.reduce((s, e) => s + (e.power_watts || 0), 0) / events.length,
+    avgPower: filtered.reduce((s, e) => s + (e.power_watts || 0), 0) / filtered.length,
     lastPower: lastEvent.power_watts || 0,
     lastVoltage: lastEvent.voltage || 0,
     lastEnergy: lastEvent.total_energy_wh || 0,

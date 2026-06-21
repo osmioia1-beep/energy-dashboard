@@ -40,10 +40,16 @@ export default function DeviceDetail() {
     return () => clearInterval(interval)
   }, [decodedName])
 
+  // Filter out false positive events (start events with negligible power)
+  const filteredEvents = events.filter(e => {
+    if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
+    return true;
+  });
+
   // Pair start/stop events into sessions
   const sessions = []
   let currentStart = null
-  for (const event of [...events].reverse()) {
+  for (const event of [...filteredEvents].reverse()) {
     if (event.event_type === 'start' || event.event_type === 'on') {
       currentStart = event
     } else if ((event.event_type === 'stop' || event.event_type === 'off') && currentStart) {
