@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Zap, Clock, TrendingUp, Activity } from 'lucide-react'
 import { getDeviceEvents, getAllDeviceEvents } from '../services/supabase'
+import { useRefresh } from '../contexts/RefreshContext'
 
 function formatDuration(seconds) {
   if (!seconds) return '—'
@@ -23,28 +24,34 @@ export default function DeviceDetail() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
   const [allEvents, setAllEvents] = useState([])
+  const { register } = useRefresh()
+
+  const load = useCallback(async () => {
+    try {
+      setError(null)
+      const data = await getDeviceEvents(decodedName, 100)
+      setEvents(data)
+      const allData = await getAllDeviceEvents(decodedName)
+      setAllEvents(allData)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [decodedName])
 
   useEffect(() => {
-    async function load() {
-      try {
-        // Load limited events for the sessions list
-        const data = await getDeviceEvents(decodedName, 100)
-        setEvents(data)
-        // Load ALL events for accurate statistics
-        const allData = await getAllDeviceEvents(decodedName)
-        setAllEvents(allData)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+    if (register) {
+      return register(load)
     }
+  }, [register, load])
+
+  useEffect(() => {
     load()
     const interval = setInterval(load, 30000)
     return () => clearInterval(interval)
-  }, [decodedName])
+  }, [load])
 
   // Filter out false positive events (start events with negligible power)
   const filteredEvents = events.filter(e => {

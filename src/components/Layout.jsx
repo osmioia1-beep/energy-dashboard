@@ -2,10 +2,13 @@ import React from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Zap, Car, Sun, Moon } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import PullToRefresh from './PullToRefresh'
+import { useRefresh } from '../contexts/RefreshContext'
 
 export default function Layout() {
   const loc = useLocation()
   const { dark, toggle } = useTheme()
+  const { refreshAll } = useRefresh()
   const isActive = (path) => {
     if (path === '/') return loc.pathname === '/'
     return loc.pathname.startsWith(path)
@@ -26,10 +29,12 @@ export default function Layout() {
         </button>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 p-4 pb-20">
-        <Outlet />
-      </main>
+      {/* Content with Pull to Refresh */}
+      <PullToRefresh onRefresh={refreshAll}>
+        <main className="flex-1 p-4 pb-20">
+          <Outlet />
+        </main>
+      </PullToRefresh>
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex">

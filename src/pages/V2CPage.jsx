@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Car, Zap, Clock, TrendingUp, Battery, Activity, Sun, Home } from 'lucide-react'
 import { getV2CSessions, getV2CStats } from '../services/supabase'
+import { useRefresh } from '../contexts/RefreshContext'
 
 function formatDuration(seconds) {
   if (!seconds) return '—'
@@ -36,27 +37,35 @@ export default function V2CPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [now, setNow] = useState(Date.now())
+  const { register } = useRefresh()
+
+  const load = useCallback(async () => {
+    try {
+      const [sessData, statsData] = await Promise.all([
+        getV2CSessions(20),
+        getV2CStats(),
+      ])
+      setSessions(sessData)
+      setStats(statsData)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [sessData, statsData] = await Promise.all([
-          getV2CSessions(20),
-          getV2CStats(),
-        ])
-        setSessions(sessData)
-        setStats(statsData)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+    if (register) {
+      return register(load)
     }
+  }, [register, load])
+
+  useEffect(() => {
     load()
     const dataInterval = setInterval(load, 30000)
     const clockInterval = setInterval(() => setNow(Date.now()), 1000)
     return () => { clearInterval(dataInterval); clearInterval(clockInterval) }
-  }, [])
+  }, [load])
 
   // Find active session (no end_time)
   const activeSession = sessions.find(s => !s.end_time)

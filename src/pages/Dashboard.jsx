@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Zap, Activity, TrendingUp } from 'lucide-react'
 import DeviceCard from '../components/DeviceCard'
 import { getDevices, getDeviceStats, getLatestEvents } from '../services/supabase'
+import { useRefresh } from '../contexts/RefreshContext'
 
 export default function Dashboard() {
   const [devices, setDevices] = useState([])
@@ -10,6 +11,13 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const { register } = useRefresh()
+
+  useEffect(() => {
+    if (register) {
+      return register(loadData)
+    }
+  }, [register, loadData])
 
   const loadData = useCallback(async () => {
     try {
