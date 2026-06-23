@@ -202,12 +202,12 @@ export default function V2CPage() {
 
       {/* Active Session Snapshots */}
       {activeSnapshots.length > 0 && (
-        <>
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Snapshots — Sessão Ativa ({activeSnapshots.length})
-          </h2>
-          <div className="space-y-2">
-            {[...activeSnapshots].reverse().map((snap, i) => (
+      <>
+      <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        Snapshots — Sessão Ativa ({activeSnapshots.length})
+      </h2>
+      <div className="space-y-2">
+        {[...activeSnapshots].slice(-40).reverse().map((snap, i) => (
               <div key={i} className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
