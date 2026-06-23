@@ -156,9 +156,11 @@ export async function getV2CSessions(limit = 20) {
 }
 
 export async function getV2CStats() {
-  // Fetch ALL sessions for accurate statistics (no limit)
+  // Fetch recent sessions (last 90 days) for statistics
+  const since = new Date()
+  since.setDate(since.getDate() - 90)
   const sessions = await supabaseFetch(
-    'v2c_charging_sessions?select=total_energy_wh,duration_seconds,avg_power_watts,carro&order=start_time.desc'
+    `v2c_charging_sessions?start_time=gte.${since.toISOString()}&select=total_energy_wh,duration_seconds,avg_power_watts,carro&order=start_time.desc&limit=100`
   )
   if (sessions.length === 0) return null
 
