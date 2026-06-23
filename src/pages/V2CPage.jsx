@@ -123,7 +123,7 @@ export default function V2CPage() {
               <span className="font-bold text-lg">{activeSession.carro || 'Carro'}</span>
             </div>
             <span className="text-sm text-white/80">
-              Início: {formatTime(activeSession.start_time)}
+              Início: {formatSnapshotTime(activeSession.start_time)}
             </span>
           </div>
 
