@@ -75,27 +75,33 @@ export async function getDeviceStats(name) {
   }
   console.log(`getDeviceStats: ${filtered.length}/${events.length} events for "${name}" (filtered ${events.length - filtered.length} false positives), last: ${filtered[0]?.event_type} @ ${filtered[0]?.power_watts}W`)
 
-  let totalEnergy = 0
-  let totalDuration = 0
   let lastEvent = filtered[0]
 
-  // Pair start/stop events to calculate actual running time
+  // Total duration = sum of duration_seconds from stop events (already computed by server)
+  // This is more accurate than pairing events since the server already calculates it
+  const stopEvents = filtered.filter(e => e.event_type === 'stop' || e.event_type === 'off')
+  let totalDuration = stopEvents.reduce((s, e) => s + (e.duration_seconds || 0), 0)
+
+  // For active sessions (unpaired start), add time since start
+  const startEvents = filtered.filter(e => e.event_type === 'start' || e.event_type === 'on')
+  if (startEvents.length > stopEvents.length) {
+    // There's an active session — add time from start to now
+    const activeStart = startEvents[0] // newest start (events are newest-first)
+    const activeDur = (Date.now() - new Date(activeStart.created_at)) / 1000
+    if (activeDur > 0 && activeDur < 86400) totalDuration += activeDur
+  }
+
+  // Total energy: pair start/stop to sum energy diffs per session
+  let totalEnergy = 0
   let currentStart = null
   for (const event of [...filtered].reverse()) {
     if (event.event_type === 'start' || event.event_type === 'on') {
       currentStart = event
     } else if ((event.event_type === 'stop' || event.event_type === 'off') && currentStart) {
-      const dur = (new Date(currentStart.created_at) - new Date(event.created_at)) / 1000
-      if (dur > 0 && dur < 86400) totalDuration += dur
-      const energyDiff = Math.abs((currentStart.total_energy_wh || 0) - (event.total_energy_wh || 0))
+      const energyDiff = Math.abs((event.total_energy_wh || 0) - (currentStart.total_energy_wh || 0))
       if (energyDiff < 10000) totalEnergy += energyDiff
       currentStart = null
     }
-  }
-  // If there's an unpaired start, device is currently running
-  if (currentStart) {
-    const dur = (Date.now() - new Date(currentStart.created_at)) / 1000
-    if (dur > 0 && dur < 86400) totalDuration += dur
   }
 
   return {
