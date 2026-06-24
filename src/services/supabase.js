@@ -37,7 +37,7 @@ export async function getLatestEvents(limit = 50) {
   const data = await supabaseFetch(
     `shelly_events?order=created_at.desc&limit=${limit}`
   )
-  // Filter out false positive events (start events with negligible power)
+  // Filter out false positive START events only — keep all stop events
   return data.filter(e => {
     if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
     return true;
@@ -64,11 +64,13 @@ export async function getDeviceStats(name) {
     console.warn(`getDeviceStats: no events for "${name}"`)
     return null
   }
-  // Filter out false positive events (start events with negligible power)
+  // Filter out false positive START events with negligible power
+  // Stop events should NEVER be filtered — they close a valid session even with low power
   const filtered = events.filter(e => {
     if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
+    // Also filter false start events where total_energy_wh doesn't change between start and next stop
     return true;
-  })
+  });
   if (filtered.length === 0) {
     console.warn(`getDeviceStats: no valid events for "${name}" after filtering`)
     return null
@@ -125,7 +127,7 @@ export async function getDailyEnergy(days = 7) {
     `shelly_events?created_at=gte.${since.toISOString()}&select=shelly_name,total_energy_wh,created_at,event_type&order=created_at.asc`
   )
 
-  // Filter out false positive events (start events with negligible power)
+  // Filter out false positive START events only — keep all stop events
   const filtered = data.filter(e => {
     if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
     return true;

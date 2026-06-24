@@ -53,7 +53,8 @@ export default function DeviceDetail() {
     return () => clearInterval(interval)
   }, [load])
 
-  // Filter out false positive events (start events with negligible power)
+  // Filter out false positive START events (negligible power)
+  // Stop events must NOT be filtered — they close valid sessions even with low/zero power
   const filteredEvents = events.filter(e => {
     if ((e.event_type === 'start' || e.event_type === 'on') && (e.power_watts || 0) < 10) return false;
     return true;
@@ -73,7 +74,12 @@ export default function DeviceDetail() {
       if (event.event_type === 'start' || event.event_type === 'on') {
         currentStart = event
       } else if ((event.event_type === 'stop' || event.event_type === 'off') && currentStart) {
-        const duration = (new Date(event.created_at) - new Date(currentStart.created_at)) / 1000
+        // Prefer server-computed duration_seconds; fallback to timestamp diff
+        const serverDuration = event.duration_seconds
+        const computedDuration = (new Date(event.created_at) - new Date(currentStart.created_at)) / 1000
+        const duration = (serverDuration != null && serverDuration > 0)
+          ? serverDuration
+          : computedDuration
         const energyDiff = Math.abs((event.total_energy_wh || 0) - (currentStart.total_energy_wh || 0))
         sessions.push({
           start: currentStart,
