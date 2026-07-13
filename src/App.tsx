@@ -4,10 +4,8 @@ import './App.css';
 
 function App() {
   const [isDark, setIsDark] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     const saved = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const initialDark = saved ? saved === 'dark' : prefersDark;
@@ -15,7 +13,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
     const root = document.documentElement;
     if (isDark) {
       root.classList.add('dark');
@@ -23,41 +20,10 @@ function App() {
       root.classList.remove('dark');
     }
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  }, [isDark, mounted]);
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⚡</span>
-                <h1 className="text-xl font-bold text-gray-900">Energy Monitor</h1>
-              </div>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="animate-pulse space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="h-24 bg-gray-200 rounded-xl"></div>
-              <div className="h-24 bg-gray-200 rounded-xl"></div>
-              <div className="h-24 bg-gray-200 rounded-xl"></div>
-              <div className="h-24 bg-gray-200 rounded-xl"></div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="h-64 bg-gray-200 rounded-xl"></div>
-              <div className="h-64 bg-gray-200 rounded-xl"></div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  }, [isDark]);
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200`}>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
