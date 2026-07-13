@@ -1,92 +1,161 @@
-import { useState, useEffect } from 'react';
-import { fetchHourlyAggregates, fetchDailyAggregates, type HourlyAggregate, type DailyAggregate } from '../lib/supabase';
+import { useEnergyData, type TimeRange, formatEnergy, formatCost, formatPct } from '../hooks/useEnergyData';
 import { PowerCard } from './PowerCard';
 import { EnergyChart } from './EnergyChart';
 
-export function Dashboard() {
-  const [hourlyData, setHourlyData] = useState<HourlyAggregate[]>([]);
-  const [dailyData, setDailyData] = useState<DailyAggregate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h');
+const TIME_RANGES: { value: TimeRange; label: string }[] = [
+  { value: 'today', label: 'Hoje' },
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: 'total', label: 'Total' },
+];
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720;
-      const days = timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30;
-      
-      const [hourly, daily] = await Promise.all([
-        fetchHourlyAggregates(hours),
-        fetchDailyAggregates(days),
-      ]);
-      
-      setHourlyData(hourly);
-      setDailyData(daily);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
-    } finally {
-      setLoading(false);
-    }
+function getChartConfig(timeRange: TimeRange, isHourlyView: boolean) {
+  if (isHourlyView) {
+    return {
+      gridTitle: 'Rede Elétrica (Horário)',
+      solarTitle: 'Produção Solar (Horário)',
+      periodTitle: 'Últimas 24h',
+      maxPoints: 24,
+    };
+  }
+  switch (timeRange) {
+    case '7d':
+      return {
+        gridTitle: 'Rede Elétrica (7 dias)',
+        solarTitle: 'Produção Solar (7 dias)',
+        periodTitle: 'Últimos 7 dias',
+        maxPoints: 7,
+      };
+    case '30d':
+      return {
+        gridTitle: 'Rede Elétrica (30 dias)',
+        solarTitle: 'Produção Solar (30 dias)',
+        periodTitle: 'Últimos 30 dias',
+        maxPoints: 30,
+      };
+    case 'total':
+      return {
+        gridTitle: 'Rede Elétrica (Mensal)',
+        solarTitle: 'Produção Solar (Mensal)',
+        periodTitle: 'Todo o histórico (Mensal)',
+        maxPoints: 12,
+      };
+    default: // 24h fallback
+      return {
+        gridTitle: 'Rede Elétrica (Diário)',
+        solarTitle: 'Produção Solar (Diário)',
+        periodTitle: 'Últimos 30 dias',
+        maxPoints: 30,
+      };
+  }
+}
+
+function getSummaryTitle(timeRange: TimeRange): string {
+  const labels: Record<TimeRange, string> = {
+    today: 'Hoje',
+    '24h': 'Últimas 24h',
+    '7d': 'Últimos 7 dias',
+    '30d': 'Últimos 30 dias',
+    total: 'Todo o histórico',
   };
+  return labels[timeRange] || 'Período';
+}
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
-    return () => clearInterval(interval);
-  }, [timeRange]);
+function getDailyChartData(
+  dailyData: { device_id: string; bucket: string; energy_wh: number | null }[],
+  deviceId: string,
+  timeRange: TimeRange
+) {
+  const filtered = dailyData.filter(d => d.device_id === deviceId);
+  
+  let sliced: typeof filtered;
+  let dateFormat: Intl.DateTimeFormatOptions;
+  
+  switch (timeRange) {
+    case 'today':
+    case '24h':
+      sliced = filtered.slice(0, 1);
+      dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      break;
+    case '7d':
+      sliced = filtered.slice(0, 7);
+      dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      break;
+    case '30d':
+      sliced = filtered.slice(0, 30);
+      dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      break;
+    case 'total':
+      sliced = filtered.slice(0, 365);
+      dateFormat = { month: 'short', year: '2-digit' };
+      break;
+    default:
+      sliced = filtered.slice(0, 30);
+      dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
+  }
+  
+  return sliced.reverse().map(d => ({
+    time: new Date(d.bucket).toLocaleDateString('pt-PT', dateFormat),
+    value: d.energy_wh || 0,
+    label: new Date(d.bucket).toLocaleDateString('pt-PT', dateFormat),
+  }));
+}
 
-  // Filter data
-  const quadroHourly = hourlyData.filter(d => d.device_id === 'quadro_principal');
-  const inversorHourly = hourlyData.filter(d => d.device_id === 'inversor');
+export function Dashboard() {
+  const {
+    hourlyData,
+    dailyData,
+    totals,
+    loading,
+    error,
+    timeRange,
+    setTimeRange,
+    refetch,
+  } = useEnergyData('24h');
 
-  const quadroDaily = dailyData.filter(d => d.device_id === 'quadro_principal');
-  const inversorDaily = dailyData.filter(d => d.device_id === 'inversor');
+  // Latest values for real-time cards
+  const latestGrid = hourlyData.find(d => d.device_id === 'quadro_principal');
+  const latestSolar = hourlyData.find(d => d.device_id === 'inversor');
 
-  // Latest values
-  const latestGrid = quadroHourly[0];
-  const latestSolar = inversorHourly[0];
-  const latestGridDaily = quadroDaily[0];
-  const latestSolarDaily = inversorDaily[0];
+  const gridPower = latestGrid?.avg_power_w || 0;
+  const solarPower = latestSolar?.avg_power_w || 0;
+  const housePower = gridPower + solarPower;
+  const exportPower = gridPower < 0 ? Math.abs(gridPower) : 0;
+  const importPower = gridPower > 0 ? gridPower : 0;
 
-  // Calculate house consumption
-  const currentHousePower = (latestGrid?.avg_power_w || 0) + (latestSolar?.avg_power_w || 0);
-  const currentExport = latestGrid?.avg_power_w && latestGrid.avg_power_w < 0 
-    ? Math.abs(latestGrid.avg_power_w) 
-    : 0;
-  const currentImport = latestGrid?.avg_power_w && latestGrid.avg_power_w > 0 
-    ? latestGrid.avg_power_w 
-    : 0;
+  // Chart configuration
+  const isHourlyView = timeRange === 'today' || timeRange === '24h';
+  const chartConfig = getChartConfig(timeRange, isHourlyView);
+  const summaryTitle = getSummaryTitle(timeRange);
 
-  // Chart data - last 24h
-  const gridChartData = quadroHourly
-    .slice(0, 24)
-    .reverse()
-    .map(d => ({
-      time: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-      value: d.energy_wh || 0,
-      label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
-    }));
+  // Chart data preparation
+  const gridChartData = isHourlyView
+    ? hourlyData
+        .filter(d => d.device_id === 'quadro_principal')
+        .slice(0, 24)
+        .reverse()
+        .map(d => ({
+          time: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+          value: d.energy_wh || 0,
+          label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
+        }))
+    : getDailyChartData(dailyData, 'quadro_principal', timeRange);
 
-  const solarChartData = inversorHourly
-    .slice(0, 24)
-    .reverse()
-    .map(d => ({
-      time: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-      value: d.energy_wh || 0,
-      label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
-    }));
+  const solarChartData = isHourlyView
+    ? hourlyData
+        .filter(d => d.device_id === 'inversor')
+        .slice(0, 24)
+        .reverse()
+        .map(d => ({
+          time: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+          value: d.energy_wh || 0,
+          label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
+        }))
+    : getDailyChartData(dailyData, 'inversor', timeRange);
 
-  const dailyChartData = quadroDaily
-    .slice(0, 7)
-    .reverse()
-    .map(d => ({
-      time: new Date(d.bucket).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' }),
-      value: d.energy_wh || 0,
-      label: new Date(d.bucket).toLocaleDateString('pt-PT', { weekday: 'short' }),
-    }));
+  // Period summary chart (always daily view, adapts to timeRange)
+  const periodChartData = getDailyChartData(dailyData, 'quadro_principal', timeRange);
 
   if (loading && !hourlyData.length) {
     return (
@@ -101,15 +170,18 @@ export function Dashboard() {
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
         <h3 className="text-red-800 dark:text-red-300 font-semibold mb-2">Erro ao carregar dados</h3>
         <p className="text-red-600 dark:text-red-400">{error}</p>
-        <button 
-          onClick={fetchData}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-        >
+        <button onClick={refetch} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
           Tentar novamente
         </button>
       </div>
     );
   }
+
+  // Format totals for display
+  const solarTotal = formatEnergy(totals.solar_wh);
+  const houseTotal = formatEnergy(totals.house_wh);
+  const exportTotal = formatEnergy(totals.export_wh);
+  const importTotal = formatEnergy(totals.import_wh);
 
   return (
     <div className="space-y-6">
@@ -119,95 +191,81 @@ export function Dashboard() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard de Energia</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Monitorização em tempo real - Solar + Rede</p>
         </div>
-        <div className="flex gap-2">
-          {['24h', '7d', '30d'].map(range => (
+        <div className="flex flex-wrap gap-2">
+          {TIME_RANGES.map(range => (
             <button
-              key={range}
-              onClick={() => setTimeRange(range as '24h' | '7d' | '30d')}
+              key={range.value}
+              onClick={() => setTimeRange(range.value)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                timeRange === range
+                timeRange === range.value
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
             >
-              {range}
+              {range.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Power Cards Grid */}
+      {/* Power Cards Grid - Real Time */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <PowerCard
           label="Produção Solar"
-          value={latestSolar?.avg_power_w || 0}
+          value={solarPower}
           unit="W"
           color="text-amber-500"
           icon="☀️"
-          trend={latestSolar?.avg_power_w && inversorHourly[1]?.avg_power_w 
-            ? ((latestSolar.avg_power_w - inversorHourly[1].avg_power_w) / Math.abs(inversorHourly[1].avg_power_w || 1)) * 100
-            : undefined}
         />
         <PowerCard
           label="Rede Elétrica"
-          value={latestGrid?.avg_power_w || 0}
+          value={gridPower}
           unit="W"
-          color={latestGrid?.avg_power_w && latestGrid.avg_power_w < 0 ? 'text-green-500' : 'text-orange-500'}
+          color={gridPower < 0 ? 'text-green-500' : 'text-orange-500'}
           icon="⚡"
-          trend={latestGrid?.avg_power_w && quadroHourly[1]?.avg_power_w
-            ? ((latestGrid.avg_power_w - quadroHourly[1].avg_power_w) / Math.abs(quadroHourly[1].avg_power_w || 1)) * 100
-            : undefined}
         />
         <PowerCard
           label="Consumo Casa"
-          value={currentHousePower}
+          value={housePower}
           unit="W"
           color="text-red-500"
           icon="🏠"
         />
         <PowerCard
-          label={currentExport > 0 ? 'Exportando' : 'Importando'}
-          value={currentExport > 0 ? currentExport : currentImport}
+          label={exportPower > 0 ? 'Exportando' : 'Importando'}
+          value={exportPower > 0 ? exportPower : importPower}
           unit="W"
-          color={currentExport > 0 ? 'text-green-500' : 'text-orange-500'}
-          icon={currentExport > 0 ? '📤' : '📥'}
+          color={exportPower > 0 ? 'text-green-500' : 'text-orange-500'}
+          icon={exportPower > 0 ? '📤' : '📥'}
         />
       </div>
 
-      {/* Daily Energy Cards */}
+      {/* Period Total Cards - Dynamic based on timeRange */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <PowerCard
-          label="Solar Hoje"
-          value={latestSolarDaily?.energy_wh || 0}
+          label={`Solar (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+          value={totals.solar_wh}
           unit="Wh"
           color="text-amber-500"
           icon="☀️"
-          trend={latestSolarDaily?.energy_wh && inversorDaily[1]?.energy_wh
-            ? ((latestSolarDaily.energy_wh - inversorDaily[1].energy_wh) / Math.abs(inversorDaily[1].energy_wh || 1)) * 100
-            : undefined}
         />
         <PowerCard
-          label="Rede Hoje"
-          value={latestGridDaily?.energy_wh || 0}
+          label={`Rede (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+          value={totals.grid_wh}
           unit="Wh"
           color="text-blue-500"
           icon="⚡"
-          trend={latestGridDaily?.energy_wh && quadroDaily[1]?.energy_wh
-            ? ((latestGridDaily.energy_wh - quadroDaily[1].energy_wh) / Math.abs(quadroDaily[1].energy_wh || 1)) * 100
-            : undefined}
         />
         <PowerCard
-          label="Custo Hoje"
-          value={(latestGridDaily?.cost_eur || 0)}
+          label={`Custo (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+          value={totals.cost_eur}
           unit="€"
           color="text-orange-500"
           icon="💰"
         />
         <PowerCard
-          label="Autoconsumo"
-          value={latestSolarDaily?.energy_wh && latestGridDaily?.energy_wh 
-            ? ((latestSolarDaily.energy_wh - Math.abs(latestGridDaily.energy_wh || 0)) / latestSolarDaily.energy_wh) * 100
-            : 0}
+          label={`Autoconsumo (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+          value={totals.autoconsumo_pct}
           unit="%"
           color="text-green-500"
           icon="♻️"
@@ -218,48 +276,63 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <EnergyChart
           data={gridChartData}
-          title="Consumo/Rede (últimas 24h)"
+          title={chartConfig.gridTitle}
           color="#3b82f6"
           unit="Wh"
+          yAxisLabel="Energia (kWh)"
         />
         <EnergyChart
           data={solarChartData}
-          title="Produção Solar (últimas 24h)"
+          title={chartConfig.solarTitle}
           color="#fbbf24"
           unit="Wh"
+          yAxisLabel="Energia (kWh)"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <EnergyChart
-          data={dailyChartData}
-          title="Consumo Diário (últimos 7 dias)"
+          data={periodChartData}
+          title={`Consumo Diário (${chartConfig.periodTitle})`}
           color="#ef4444"
           unit="Wh"
+          yAxisLabel="Energia (kWh)"
         />
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Resumo do Período</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Resumo do Período ({summaryTitle})
+          </h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Total Consumo Casa</span>
-              <span className="font-medium">{(dailyChartData.reduce((a, b) => a + b.value, 0) / 1000).toFixed(2)} kWh</span>
+              <span className="font-medium">{houseTotal.value.toFixed(2)} {houseTotal.unit}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Total Produção Solar</span>
-              <span className="font-medium">{((inversorDaily.slice(0,7).reduce((a, b) => a + (b.energy_wh || 0), 0)) / 1000).toFixed(2)} kWh</span>
+              <span className="font-medium">{solarTotal.value.toFixed(2)} {solarTotal.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Exportado para Rede</span>
+              <span className="font-medium text-green-500">{exportTotal.value.toFixed(2)} {exportTotal.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Importado da Rede</span>
+              <span className="font-medium text-orange-500">{importTotal.value.toFixed(2)} {importTotal.unit}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Custo Estimado</span>
-              <span className="font-medium">{quadroDaily.slice(0,7).reduce((a, b) => a + (b.cost_eur || 0), 0).toFixed(2)} €</span>
+              <span className="font-medium">{formatCost(totals.cost_eur)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Autoconsumo</span>
+              <span className="font-medium text-green-500">{formatPct(totals.autoconsumo_pct)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Autossuficiência</span>
               <span className="font-medium text-green-500">
-                {(() => {
-                  const solar = inversorDaily.slice(0,7).reduce((a, b) => a + (b.energy_wh || 0), 0);
-                  const grid = Math.abs(quadroDaily.slice(0,7).reduce((a, b) => a + (b.energy_wh || 0), 0));
-                  return solar > 0 ? ((solar - grid) / solar * 100).toFixed(1) : '0';
-                })()}%
+                {totals.solar_wh > 0 
+                  ? formatPct(Math.min(100, (totals.solar_wh - totals.export_wh) / totals.solar_wh * 100))
+                  : '0%'}
               </span>
             </div>
           </div>
