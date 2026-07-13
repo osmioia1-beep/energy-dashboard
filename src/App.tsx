@@ -23,22 +23,22 @@ function App() {
   }, [isDark]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+    <div className="min-h-screen bg-primary transition-colors duration-200">
+      <header className="bg-secondary border-b border-border sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <span className="text-2xl">⚡</span>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Energy Monitor</h1>
+              <h1 className="text-xl font-bold text-primary">Energy Monitor</h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
+              <span className="text-sm text-secondary hidden sm:block">
                 Vila Nova de Famalicão
               </span>
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>
               <button
                 onClick={() => setIsDark(!isDark)}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="p-2 rounded-lg bg-tertiary text-secondary hover:bg-border-hover transition-colors"
                 aria-label={isDark ? 'Alternar para modo claro' : 'Alternar para modo escuro'}
                 title={isDark ? 'Modo escuro - clique para modo claro' : 'Modo claro - clique para modo escuro'}
               >
