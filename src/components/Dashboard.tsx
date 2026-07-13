@@ -4,6 +4,7 @@ import { EnergyChart } from './EnergyChart';
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: 'today', label: 'Hoje' },
+  { value: 'yesterday', label: 'Ontem' },
   { value: '24h', label: '24h' },
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
@@ -15,7 +16,7 @@ function getChartConfig(timeRange: TimeRange, isHourlyView: boolean) {
     return {
       gridTitle: 'Rede Elétrica (Horário)',
       solarTitle: 'Produção Solar (Horário)',
-      periodTitle: 'Últimas 24h',
+      periodTitle: timeRange === 'today' ? 'Hoje' : timeRange === 'yesterday' ? 'Ontem' : 'Últimas 24h',
       maxPoints: 24,
     };
   }
@@ -41,7 +42,7 @@ function getChartConfig(timeRange: TimeRange, isHourlyView: boolean) {
         periodTitle: 'Todo o histórico (Mensal)',
         maxPoints: 12,
       };
-    default: // 24h fallback
+    default:
       return {
         gridTitle: 'Rede Elétrica (Diário)',
         solarTitle: 'Produção Solar (Diário)',
@@ -54,6 +55,7 @@ function getChartConfig(timeRange: TimeRange, isHourlyView: boolean) {
 function getSummaryTitle(timeRange: TimeRange): string {
   const labels: Record<TimeRange, string> = {
     today: 'Hoje',
+    yesterday: 'Ontem',
     '24h': 'Últimas 24h',
     '7d': 'Últimos 7 dias',
     '30d': 'Últimos 30 dias',
@@ -74,6 +76,7 @@ function getDailyChartData(
   
   switch (timeRange) {
     case 'today':
+    case 'yesterday':
     case '24h':
       sliced = filtered.slice(0, 1);
       dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
@@ -125,7 +128,7 @@ export function Dashboard() {
   const importPower = gridPower > 0 ? gridPower : 0;
 
   // Chart configuration
-  const isHourlyView = timeRange === 'today' || timeRange === '24h';
+  const isHourlyView = timeRange === 'today' || timeRange === 'yesterday' || timeRange === '24h';
   const chartConfig = getChartConfig(timeRange, isHourlyView);
   const summaryTitle = getSummaryTitle(timeRange);
 

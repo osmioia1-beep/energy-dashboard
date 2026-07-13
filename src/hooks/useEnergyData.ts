@@ -6,23 +6,23 @@ import {
   type DailyAggregate 
 } from '../lib/supabase';
 
-export type TimeRange = 'today' | '24h' | '7d' | '30d' | 'total';
+export type TimeRange = 'today' | 'yesterday' | '24h' | '7d' | '30d' | 'total';
 
 export interface UnifiedDataPoint {
-  bucket: string;           // ISO date/hour string
+  bucket: string;
   device_id: string;
-  energy_wh: number;        // energia no período (Wh)
-  avg_power_w: number;      // potência média (W)
-  max_power_w: number;      // potência máxima (W)
-  cost_eur?: number;        // só em daily
-  exported_wh?: number;     // só em daily
+  energy_wh: number;
+  avg_power_w: number;
+  max_power_w: number;
+  cost_eur?: number;
+  exported_wh?: number;
   granularity: 'hour' | 'day' | 'month';
 }
 
 export interface AggregatedTotals {
   solar_wh: number;
   grid_wh: number;
-  house_wh: number;         // solar + grid (com sinal)
+  house_wh: number;
   export_wh: number;
   import_wh: number;
   cost_eur: number;
@@ -44,39 +44,56 @@ interface UseEnergyDataResult {
 function getTimeRangeParams(range: TimeRange): { hours: number; days: number } {
   switch (range) {
     case 'today': return { hours: 24, days: 1 };
+    case 'yesterday': return { hours: 48, days: 2 };
     case '24h': return { hours: 24, days: 1 };
     case '7d': return { hours: 168, days: 7 };
     case '30d': return { hours: 720, days: 30 };
-    case 'total': return { hours: 8760, days: 365 }; // ~1 ano, pega tudo
+    case 'total': return { hours: 8760, days: 365 };
+  }
+}
+
+function getDateRange(range: TimeRange): { start: Date; end: Date } {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  
+  switch (range) {
+    case 'today': {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { start, end };
+    }
+    case 'yesterday': {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+      return { start, end: endYesterday };
+    }
+    case '24h': {
+      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      return { start, end: now };
+    }
+    case '7d': {
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return { start, end: now };
+    }
+    case '30d': {
+      const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return { start, end: now };
+    }
+    case 'total': {
+      const start = new Date(now.getFullYear(), 0, 1);
+      return { start, end: now };
+    }
   }
 }
 
 function filterByRange<T extends { bucket: string }>(
   data: T[], 
-  range: TimeRange, 
-  _granularity: 'hour' | 'day'
+  range: TimeRange
 ): T[] {
-  const now = new Date();
-  let cutoff: Date;
-
-  switch (range) {
-    case 'today':
-      cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      break;
-    case '24h':
-      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
-    case '7d':
-      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case '30d':
-      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case 'total':
-      return data; // sem filtro
-  }
-
-  return data.filter(d => new Date(d.bucket) >= cutoff);
+  const { start, end } = getDateRange(range);
+  return data.filter(d => {
+    const bucketDate = new Date(d.bucket);
+    return bucketDate >= start && bucketDate <= end;
+  });
 }
 
 function unifyData(
@@ -84,7 +101,7 @@ function unifyData(
   daily: DailyAggregate[], 
   range: TimeRange
 ): UnifiedDataPoint[] {
-  const isHourly = range === 'today' || range === '24h';
+  const isHourly = range === 'today' || range === 'yesterday' || range === '24h';
   const source = isHourly ? hourly : daily;
   const granularity = isHourly ? 'hour' : range === 'total' ? 'month' : 'day';
 
@@ -157,7 +174,6 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
       
       const { hours, days } = getTimeRangeParams(timeRange);
       
-      // Para 'total', buscamos máximo possível
       const fetchHours = timeRange === 'total' ? 8760 : hours;
       const fetchDays = timeRange === 'total' ? 365 : days;
 
@@ -177,17 +193,17 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000); // 60s
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, [timeRange]);
 
   // Filtrar dados conforme range selecionado
   const filteredHourly = useMemo(
-    () => filterByRange(hourlyData, timeRange, 'hour'),
+    () => filterByRange(hourlyData, timeRange),
     [hourlyData, timeRange]
   );
   const filteredDaily = useMemo(
-    () => filterByRange(dailyData, timeRange, 'day'),
+    () => filterByRange(dailyData, timeRange),
     [dailyData, timeRange]
   );
 
