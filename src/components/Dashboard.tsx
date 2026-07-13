@@ -124,11 +124,9 @@ function CombinedEnergyChart({ gridData, solarData, title, height = 280, yAxisLa
   const [showSolar, setShowSolar] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Prepare data
   const visibleGridData = showGrid ? gridData : [];
   const visibleSolarData = showSolar ? solarData : [];
 
-  // Determine combined data range
   const allValues = [
     ...visibleGridData.map(d => d.value),
     ...visibleSolarData.map(d => d.value),
@@ -137,12 +135,11 @@ function CombinedEnergyChart({ gridData, solarData, title, height = 280, yAxisLa
   const minValue = Math.min(0, ...allValues);
   const range = maxValue - minValue || 1;
 
-  // X scale - align by time labels
   const labels = Array.from(new Set([
     ...visibleGridData.map(d => d.label || d.time),
     ...visibleSolarData.map(d => d.label || d.time),
   ])).sort();
-  
+
   const dataLength = labels.length;
   const padding = { top: 30, right: 20, bottom: 50, left: 80 };
   const chartHeight = height - padding.top - padding.bottom;
@@ -151,8 +148,7 @@ function CombinedEnergyChart({ gridData, solarData, title, height = 280, yAxisLa
   const xScale = (i: number) => padding.left + (i / (dataLength - 1)) * chartWidth;
   const yScale = (value: number) => padding.top + chartHeight - ((value - minValue) / range) * chartHeight;
 
-  // Convert series data to points aligned with labels
-  const getPoints = (data: ChartDataPoint[], color: string) => 
+  const getPoints = (data: ChartDataPoint[], color: string) =>
     labels.map((label, i) => {
       const point = data.find(d => (d.label || d.time) === label);
       return {
@@ -167,7 +163,6 @@ function CombinedEnergyChart({ gridData, solarData, title, height = 280, yAxisLa
   const gridPoints = getPoints(visibleGridData, SERIES_COLORS.grid);
   const solarPoints = getPoints(visibleSolarData, SERIES_COLORS.solar);
 
-  // Build paths
   const buildPath = (points: typeof gridPoints) => {
     const validPoints = points.filter(p => p.hasData);
     if (validPoints.length < 2) return '';
@@ -194,10 +189,8 @@ function CombinedEnergyChart({ gridData, solarData, title, height = 280, yAxisLa
 
   const yTicks = getYAxisTicks(maxValue, minValue, 'Wh');
 
-  // Combine all points for hover detection
   const allPoints = [...gridPoints, ...solarPoints].sort((a, b) => a.x - b.x);
 
-  // Hover state
   const showTooltip = hoverIndex !== null && (showGrid || showSolar);
   const hoveredPoint = showTooltip ? allPoints[hoverIndex] : null;
 
@@ -431,7 +424,6 @@ export function Dashboard() {
     refetch,
   } = useEnergyData('24h');
 
-  // Latest values for real-time cards
   const latestGrid = hourlyData.find(d => d.device_id === 'quadro_principal');
   const latestSolar = hourlyData.find(d => d.device_id === 'inversor');
 
@@ -441,12 +433,10 @@ export function Dashboard() {
   const exportPower = gridPower < 0 ? Math.abs(gridPower) : 0;
   const importPower = gridPower > 0 ? gridPower : 0;
 
-  // Chart configuration
   const isHourlyView = timeRange === 'today' || timeRange === 'yesterday' || timeRange === '24h';
   const chartConfig = getChartConfig(timeRange, isHourlyView);
   const summaryTitle = getSummaryTitle(timeRange);
 
-  // Chart data preparation
   const gridChartData = isHourlyView
     ? hourlyData
         .filter(d => d.device_id === 'quadro_principal')
@@ -471,9 +461,6 @@ export function Dashboard() {
         }))
     : getDailyChartData(dailyData, 'inversor', timeRange);
 
-  // Period summary chart (always daily view, adapts to timeRange)
-  const periodChartData = getDailyChartData(dailyData, 'quadro_principal', timeRange);
-
   if (loading && !hourlyData.length) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -494,7 +481,6 @@ export function Dashboard() {
     );
   }
 
-  // Format totals for display
   const solarTotal = formatEnergy(totals.solar_wh);
   const houseTotal = formatEnergy(totals.house_wh);
   const exportTotal = formatEnergy(totals.export_wh);
@@ -598,50 +584,42 @@ export function Dashboard() {
           yAxisLabel="Energia (kWh)"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <CombinedEnergyChart
-            gridData={periodChartData}
-            solarData={getDailyChartData(dailyData, 'inversor', timeRange)}
-            title={`Energia Diária (${chartConfig.periodTitle})`}
-            yAxisLabel="Energia (kWh)"
-          />
-          <div className="bg-secondary rounded-xl p-5 shadow-card border border-color">
-            <h3 className="text-lg font-semibold text-primary mb-4">
-              Resumo do Período ({summaryTitle})
-            </h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-secondary">Total Consumo Casa</span>
-                <span className="font-medium">{houseTotal.value.toFixed(2)} {houseTotal.unit}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary">Total Produção Solar</span>
-                <span className="font-medium">{solarTotal.value.toFixed(2)} {solarTotal.unit}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary">Exportado para Rede</span>
-                <span className="font-medium text-green-500">{exportTotal.value.toFixed(2)} {exportTotal.unit}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary">Importado da Rede</span>
-                <span className="font-medium text-orange-500">{importTotal.value.toFixed(2)} {importTotal.unit}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary">Custo Estimado</span>
-                <span className="font-medium">{formatCost(totals.cost_eur)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary">Autoconsumo</span>
-                <span className="font-medium text-green-500">{formatPct(totals.autoconsumo_pct)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary">Autossuficiência</span>
-                <span className="font-medium text-green-500">
-                  {totals.solar_wh > 0 
-                    ? formatPct(Math.min(100, (totals.solar_wh - totals.export_wh) / totals.solar_wh * 100))
-                    : '0%'}
-                </span>
-              </div>
+        <div className="bg-secondary rounded-xl p-5 shadow-card border border-color">
+          <h3 className="text-lg font-semibold text-primary mb-4">
+            Resumo do Período ({summaryTitle})
+          </h3>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-secondary">Total Consumo Casa</span>
+              <span className="font-medium">{houseTotal.value.toFixed(2)} {houseTotal.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary">Total Produção Solar</span>
+              <span className="font-medium">{solarTotal.value.toFixed(2)} {solarTotal.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary">Exportado para Rede</span>
+              <span className="font-medium text-green-500">{exportTotal.value.toFixed(2)} {exportTotal.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary">Importado da Rede</span>
+              <span className="font-medium text-orange-500">{importTotal.value.toFixed(2)} {importTotal.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary">Custo Estimado</span>
+              <span className="font-medium">{formatCost(totals.cost_eur)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary">Autoconsumo</span>
+              <span className="font-medium text-green-500">{formatPct(totals.autoconsumo_pct)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-secondary">Autossuficiência</span>
+              <span className="font-medium text-green-500">
+                {totals.solar_wh > 0 
+                  ? formatPct(Math.min(100, (totals.solar_wh - totals.export_wh) / totals.solar_wh * 100))
+                  : '0%'}
+              </span>
             </div>
           </div>
         </div>
