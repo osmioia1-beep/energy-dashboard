@@ -417,6 +417,7 @@ export function Dashboard() {
     hourlyData,
     dailyData,
     totals,
+    realTime,
     loading,
     error,
     timeRange,
@@ -424,12 +425,8 @@ export function Dashboard() {
     refetch,
   } = useEnergyData('24h');
 
-  const latestGrid = hourlyData.find(d => d.device_id === 'quadro_principal');
-  const latestSolar = hourlyData.find(d => d.device_id === 'inversor');
-
-  const gridPower = latestGrid?.avg_power_w || 0;
-  const solarPower = latestSolar?.avg_power_w || 0;
-  const housePower = gridPower + solarPower;
+  // Tempo Real: usa o objeto realTime do hook (dados não filtrados)
+  const { solarPower, gridPower, housePower } = realTime;
 
   const isHourlyView = timeRange === 'today' || timeRange === 'yesterday' || timeRange === '24h';
   const chartConfig = getChartConfig(timeRange, isHourlyView);

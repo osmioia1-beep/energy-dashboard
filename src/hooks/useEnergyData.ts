@@ -114,16 +114,23 @@ function unifyData(
   const source = isHourly ? hourly : daily;
   const granularity = isHourly ? 'hour' : range === 'total' ? 'month' : 'day';
 
-  return source.map(d => ({
-    bucket: d.bucket,
-    device_id: d.device_id,
-    energy_wh: d.energy_wh || 0,
-    avg_power_w: d.avg_power_w || 0,
-    max_power_w: d.max_power_w || 0,
-    cost_eur: 'cost_eur' in d ? (d as DailyAggregate).cost_eur || 0 : undefined,
-    exported_wh: 'exported_wh' in d ? (d as DailyAggregate).exported_wh || 0 : undefined,
-    granularity,
-  }));
+  // Para cost_eur e exported_wh, SEMPRE usar daily aggregates
+  const dailyMap = new Map(daily.map(d => [`${d.device_id}-${d.bucket}`, d]));
+
+  return source.map(d => {
+    const dailyKey = `${d.device_id}-${d.bucket}`;
+    const dailyRecord = dailyMap.get(dailyKey);
+    return {
+      bucket: d.bucket,
+      device_id: d.device_id,
+      energy_wh: d.energy_wh || 0,
+      avg_power_w: d.avg_power_w || 0,
+      max_power_w: d.max_power_w || 0,
+      cost_eur: dailyRecord?.cost_eur ?? undefined,
+      exported_wh: dailyRecord?.exported_wh ?? undefined,
+      granularity,
+    };
+  });
 }
 
 function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
