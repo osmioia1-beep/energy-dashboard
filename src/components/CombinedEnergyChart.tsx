@@ -9,6 +9,7 @@ export interface ChartDataPoint {
   time: string;
   value: number;
   label?: string;
+  bucket?: string; // original bucket for proper sorting
 }
 
 export interface CombinedEnergyChartProps {
@@ -37,7 +38,14 @@ function getYAxisTicks(maxValue: number, minValue: number, unit: string): { valu
   });
 }
 
-function parseLabelToDate(label: string): number {
+// Parse various label formats to timestamp for chronological sorting
+function parseLabelToTimestamp(label: string, bucket?: string): number {
+  // If we have the original bucket, use it directly
+  if (bucket) {
+    return new Date(bucket).getTime();
+  }
+  
+  // Fallback: parse label formats
   const formats = [
     // "Seg 13/07" or "Mon 07/13"
     /^(\w{3})\s+(\d{2})\/(\d{2})$/,
@@ -47,6 +55,8 @@ function parseLabelToDate(label: string): number {
     /^(\d{2})\/(\d{2})\/(\d{4})$/,
     // "Jul 24" - short month + 2-digit year
     /^(\w{3})\s+(\d{2})$/,
+    // "13:00" or "13:30" - time only
+    /^(\d{2}):(\d{2})$/,
   ];
   
   for (const regex of formats) {
@@ -78,14 +88,27 @@ function parseLabelToDate(label: string): number {
           return new Date(year, month).getTime();
         }
       }
+      if (regex === formats[4]) {
+        // Time only - assume today
+        const [, hour, minute] = match;
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hour), parseInt(minute)).getTime();
+      }
     }
   }
-  // Fallback: try parsing as ISO date
+  
+  // Try ISO parsing as last resort
   const isoDate = new Date(label).getTime();
   return isNaN(isoDate) ? 0 : isoDate;
 }
 
-export function CombinedEnergyChart({ gridData, solarData, title, height = 280, yAxisLabel }: CombinedEnergyChartProps) {
+export function CombinedEnergyChart({ 
+  gridData, 
+  solarData, 
+  title, 
+  height = 280, 
+  yAxisLabel
+}: CombinedEnergyChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showSolar, setShowSolar] = useState(true);
@@ -94,7 +117,7 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
   const visibleGridData = showGrid ? gridData : [];
   const visibleSolarData = showSolar ? solarData : [];
 
-  // Create a combined map of all data points keyed by label/time
+  // Create combined data map keyed by label, preserving original bucket for sorting
   const dataMap = useMemo(() => {
     const map = new Map<string, { grid?: ChartDataPoint; solar?: ChartDataPoint }>();
     
@@ -112,9 +135,15 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
     return map;
   }, [visibleGridData, visibleSolarData]);
 
-  // Sort labels chronologically using date parsing
+  // Sort labels chronologically using bucket timestamp when available
   const labels = useMemo(() => 
-    Array.from(dataMap.keys()).sort((a, b) => parseLabelToDate(a) - parseLabelToDate(b)),
+    Array.from(dataMap.keys()).sort((a, b) => {
+      const entryA = dataMap.get(a);
+      const entryB = dataMap.get(b);
+      const bucketA = entryA?.grid?.bucket || entryA?.solar?.bucket;
+      const bucketB = entryB?.grid?.bucket || entryB?.solar?.bucket;
+      return parseLabelToTimestamp(a, bucketA) - parseLabelToTimestamp(b, bucketB);
+    }),
   [dataMap]);
 
   const allValues = useMemo(() => labels.flatMap(label => {
@@ -127,7 +156,7 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
   const range = maxValue - minValue || 1;
 
   const dataLength = labels.length;
-  const padding = { top: 30, right: 20, bottom: 50, left: 80 };
+  const padding = { top: 30, right: 20, bottom: 50, left: 70 };
   const chartHeight = height - padding.top - padding.bottom;
   const chartWidth = 600 - padding.left - padding.right;
 
@@ -180,9 +209,24 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
 
   const yTicks = getYAxisTicks(maxValue, minValue, 'Wh');
 
+  // Tooltip data - always show both series at hovered index
   const showTooltip = hoverIndex !== null && (showGrid || showSolar);
   const hoveredGrid = showTooltip ? gridPoints[hoverIndex] : null;
   const hoveredSolar = showTooltip ? solarPoints[hoverIndex] : null;
+  const hoveredLabel = showTooltip ? labels[hoverIndex] : null;
+
+  // Find closest label index on mouse move
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const closestIndex = labels.reduce((closest, _, index) => {
+      const dist = Math.abs(xScale(index) - mouseX);
+      const closestDist = Math.abs(xScale(closest) - mouseX);
+      return dist < closestDist ? index : closest;
+    }, 0);
+    setHoverIndex(closestIndex);
+  };
 
   return (
     <div className="bg-secondary rounded-xl p-5 shadow-card border border-color">
@@ -198,17 +242,7 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
           height={height} 
           viewBox={`0 0 600 ${height}`} 
           preserveAspectRatio="none"
-          onMouseMove={(e) => {
-            if (!svgRef.current) return;
-            const rect = svgRef.current.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const closestIndex = labels.reduce((closest, _, index) => {
-              const dist = Math.abs(xScale(index) - mouseX);
-              const closestDist = Math.abs(xScale(closest) - mouseX);
-              return dist < closestDist ? index : closest;
-            }, 0);
-            setHoverIndex(closestIndex);
-          }}
+          onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverIndex(null)}
           style={{ cursor: 'crosshair', width: '100%', height: `${height}px` }}
         >
@@ -308,9 +342,9 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
           {/* Hover vertical line */}
           {showTooltip && (
             <line
-              x1={xScale(hoverIndex)}
+              x1={xScale(hoverIndex!)}
               y1={padding.top}
-              x2={xScale(hoverIndex)}
+              x2={xScale(hoverIndex!)}
               y2={padding.top + chartHeight}
               stroke="var(--chart-text)"
               strokeWidth="1"
@@ -319,48 +353,49 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
             />
           )}
           
-          {/* Tooltip */}
-          {showTooltip && (
-                      <g>
-                        <foreignObject 
-                          x={xScale(hoverIndex) - 140} 
-                          y={yScale(Math.max(hoveredGrid?.value || 0, hoveredSolar?.value || 0)) - 100} 
-                          width={280} 
-                          height={100}
-                          style={{ pointerEvents: 'none' }}
-                        >
-                          <div style={{ 
-                            background: 'var(--bg-secondary)', 
-                            border: '1px solid var(--border-color)',
-                            color: 'var(--text-primary)',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            boxShadow: 'var(--card-shadow)',
-                            fontSize: '13px',
-                            lineHeight: '1.5',
-                          }}>
-                            <div style={{ fontWeight: '600', marginBottom: '6px', color: 'var(--text-primary)' }}>
-                              {labels[hoverIndex]}
-                            </div>
-                            {hoveredGrid && hoveredGrid.hasData && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '3px 0' }}>
-                                <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.grid }}></span>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Rede</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredGrid.value, 'Wh')}</span>
-                              </div>
-                            )}
-                            {hoveredSolar && hoveredSolar.hasData && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '3px 0' }}>
-                                <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.solar }}></span>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Solar</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredSolar.value, 'Wh')}</span>
-                              </div>
-                            )}
-                          </div>
-                        </foreignObject>
-                      </g>
-                    )}
-                  </svg>
+          {/* Tooltip - positioned within chart area, shows BOTH series */}
+          {showTooltip && hoveredLabel && (
+            <g>
+              <foreignObject 
+                x={Math.max(padding.left, Math.min(padding.left + chartWidth - 280, xScale(hoverIndex!) - 140))} 
+                y={padding.top + 20} 
+                width={280} 
+                height={120}
+                style={{ pointerEvents: 'none' }}
+              >
+                <div style={{ 
+                  background: 'var(--bg-secondary)', 
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  boxShadow: 'var(--card-shadow)',
+                  fontSize: '12px',
+                  lineHeight: '1.6',
+                  minWidth: '260px',
+                }}>
+                  <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)', fontSize: '13px' }}>
+                    {hoveredLabel}
+                  </div>
+                  {hoveredGrid && hoveredGrid.hasData && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.grid }}></span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Rede</span>
+                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredGrid.value, 'Wh')}</span>
+                    </div>
+                  )}
+                  {hoveredSolar && hoveredSolar.hasData && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.solar }}></span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Solar</span>
+                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredSolar.value, 'Wh')}</span>
+                    </div>
+                  )}
+                </div>
+              </foreignObject>
+            </g>
+          )}
+        </svg>
         
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 h-full flex flex-col justify-between pr-2 text-xs text-secondary pointer-events-none" style={{ height: `${height}px` }}>
@@ -371,31 +406,36 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
           ))}
         </div>
 
-        {/* X-axis labels */}
+        {/* X-axis labels - responsive for mobile */}
         <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 mt-2 text-xs text-secondary" style={{ paddingLeft: `${padding.left}px`, paddingRight: `${padding.right}px` }}>
-          {labels.map((label, i) => i % Math.max(1, Math.ceil(labels.length / 8)) === 0 && (
-            <span key={i} style={{ left: `${(i / (dataLength - 1)) * 100}%` }}>{label}</span>
-          ))}
+          {labels.map((label, i) => {
+            const showLabel = dataLength <= 8 ? true : i % Math.ceil(dataLength / 6) === 0;
+            return showLabel && (
+              <span key={i} style={{ left: `${(i / Math.max(1, dataLength - 1)) * 100}%`, whiteSpace: 'nowrap', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {label}
+              </span>
+            );
+          })}
         </div>
       </div>
 
-      {/* Legend / Series toggles */}
-      <div className="chart-legend mt-4 pt-4 border-t border-color">
+      {/* Legend / Series toggles - mobile friendly */}
+      <div className="chart-legend mt-4 pt-4 border-t border-color flex flex-wrap gap-4">
         <button
           onClick={() => setShowGrid(!showGrid)}
-          className="chart-legend-item"
+          className="chart-legend-item flex items-center gap-2"
           style={{ opacity: showGrid ? 1 : 0.4 }}
         >
-          <span className="chart-legend-color" style={{ backgroundColor: SERIES_COLORS.grid }}></span>
-          <span>Rede Elétrica</span>
+          <span className="chart-legend-color" style={{ backgroundColor: SERIES_COLORS.grid, width: '12px', height: '12px', borderRadius: '2px' }}></span>
+          <span className="text-sm">Rede Elétrica</span>
         </button>
         <button
           onClick={() => setShowSolar(!showSolar)}
-          className="chart-legend-item"
+          className="chart-legend-item flex items-center gap-2"
           style={{ opacity: showSolar ? 1 : 0.4 }}
         >
-          <span className="chart-legend-color" style={{ backgroundColor: SERIES_COLORS.solar }}></span>
-          <span>Produção Solar</span>
+          <span className="chart-legend-color" style={{ backgroundColor: SERIES_COLORS.solar, width: '12px', height: '12px', borderRadius: '2px' }}></span>
+          <span className="text-sm">Produção Solar</span>
         </button>
       </div>
     </div>

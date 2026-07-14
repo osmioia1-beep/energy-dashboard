@@ -82,6 +82,48 @@ function getDailyChartData(
     time: new Date(d.bucket).toLocaleDateString('pt-PT', dateFormat),
     value: d.energy_wh || 0,
     label: new Date(d.bucket).toLocaleDateString('pt-PT', dateFormat),
+    bucket: d.bucket, // preserve original bucket for sorting
+  }));
+}
+
+function getHourlyChartData(
+  hourlyData: { device_id: string; bucket: string; energy_wh: number | null; avg_power_w: number | null }[],
+  deviceId: string,
+  timeRange: TimeRange
+) {
+  const filtered = hourlyData.filter(d => d.device_id === deviceId);
+  // Sort by bucket ascending (oldest first)
+  const sorted = filtered.sort((a, b) => new Date(a.bucket).getTime() - new Date(b.bucket).getTime());
+  
+  let sliced: typeof sorted;
+  let timeFormat: Intl.DateTimeFormatOptions;
+  
+  switch (timeRange) {
+    case 'today':
+      // Today: from midnight to now (or last available hour)
+      sliced = sorted.slice(-24); // last 24 hours, but today only has hours from 00:00
+      timeFormat = { hour: '2-digit', minute: '2-digit' };
+      break;
+    case 'yesterday':
+      // Yesterday: full 24h
+      sliced = sorted.slice(-24);
+      timeFormat = { hour: '2-digit', minute: '2-digit' };
+      break;
+    case '24h':
+      // Last 24 hours: from current hour yesterday to current hour today
+      sliced = sorted.slice(-24);
+      timeFormat = { hour: '2-digit', minute: '2-digit' };
+      break;
+    default:
+      sliced = sorted.slice(-24);
+      timeFormat = { hour: '2-digit', minute: '2-digit' };
+  }
+  
+  return sliced.map(d => ({
+    time: new Date(d.bucket).toLocaleTimeString('pt-PT', timeFormat),
+    value: d.energy_wh || 0,
+    label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
+    bucket: d.bucket, // preserve for sorting
   }));
 }
 
@@ -107,27 +149,11 @@ export function Dashboard() {
 
   // Chart data preparation
   const gridChartData = isHourlyView
-    ? hourlyData
-        .filter(d => d.device_id === 'quadro_principal')
-        .slice(0, 24)
-        .reverse()
-        .map(d => ({
-          time: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-          value: d.energy_wh || 0,
-          label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
-        }))
+    ? getHourlyChartData(hourlyData, 'quadro_principal', timeRange)
     : getDailyChartData(dailyData, 'quadro_principal', timeRange);
 
   const solarChartData = isHourlyView
-    ? hourlyData
-        .filter(d => d.device_id === 'inversor')
-        .slice(0, 24)
-        .reverse()
-        .map(d => ({
-          time: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-          value: d.energy_wh || 0,
-          label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
-        }))
+    ? getHourlyChartData(hourlyData, 'inversor', timeRange)
     : getDailyChartData(dailyData, 'inversor', timeRange);
 
   if (loading && !hourlyData.length) {
@@ -156,7 +182,7 @@ export function Dashboard() {
   const importTotal = formatEnergy(totals.import_wh);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       {/* Header with time range selector */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

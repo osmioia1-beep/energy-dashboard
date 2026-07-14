@@ -63,41 +63,42 @@ function getTimeRangeParams(range: TimeRange): { hours: number; days: number } {
 
 function getDateRange(range: TimeRange): { start: Date; end: Date } {
   const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
   
   switch (range) {
     case 'today': {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
       return { start, end };
     }
     case 'yesterday': {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
-      return { start, end: endYesterday };
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+      return { start, end };
     }
     case '24h': {
+      const end = new Date(now);
       const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      return { start, end: now };
+      return { start, end };
     }
     case '7d': {
+      const end = new Date(now);
       const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return { start, end: now };
+      return { start, end };
     }
     case '30d': {
+      const end = new Date(now);
       const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      return { start, end: now };
+      return { start, end };
     }
     case 'total': {
       const start = new Date(now.getFullYear(), 0, 1);
-      return { start, end: now };
+      const end = new Date(now);
+      return { start, end };
     }
   }
 }
 
-function filterByRange<T extends { bucket: string }>(
-  data: T[], 
-  range: TimeRange
-): T[] {
+function filterByRange<T extends { bucket: string }>(data: T[], range: TimeRange): T[] {
   const { start, end } = getDateRange(range);
   return data.filter(d => {
     const bucketDate = new Date(d.bucket);
@@ -114,14 +115,19 @@ function unifyData(
   const source = isHourly ? hourly : daily;
   const granularity = isHourly ? 'hour' : range === 'total' ? 'month' : 'day';
 
-  // Para cost_eur e exported_wh, SEMPRE usar daily aggregates
-  // Match by DATE (not exact bucket) - daily buckets are YYYY-MM-DD, hourly are YYYY-MM-DDTHH:MM:SS
-  const dailyMap = new Map(daily.map(d => [d.bucket, d]));
+  // Build daily lookup by DATE (YYYY-MM-DD) from ALL daily data (not filtered)
+  // This ensures we have cost/export data even for edge hours
+  const dailyMap = new Map<string, DailyAggregate>();
+  daily.forEach(d => {
+    const dateKey = d.bucket.split('T')[0]; // Ensure we use date part only
+    dailyMap.set(dateKey, d);
+  });
 
   return source.map(d => {
     // For hourly data, extract date part to match daily bucket
-    const dateKey = isHourly ? d.bucket.split('T')[0] : d.bucket;
+    const dateKey = isHourly ? d.bucket.split('T')[0] : d.bucket.split('T')[0];
     const dailyRecord = dailyMap.get(dateKey);
+    
     return {
       bucket: d.bucket,
       device_id: d.device_id,
@@ -142,7 +148,7 @@ function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
   const solar_wh = solar.reduce((sum, d) => sum + d.energy_wh, 0);
   const grid_wh = grid.reduce((sum, d) => sum + d.energy_wh, 0);
 
-  // Export/Import do grid (quadro_principal)
+  // Export/Import from grid (quadro_principal)
   const export_wh = grid
     .filter(d => d.energy_wh < 0)
     .reduce((sum, d) => sum + Math.abs(d.energy_wh), 0);
@@ -150,20 +156,21 @@ function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
     .filter(d => d.energy_wh > 0)
     .reduce((sum, d) => sum + d.energy_wh, 0);
 
-  // House consumption = solar + grid (grid já tem sinal)
+  // House consumption = solar + grid (grid already has sign)
   const house_wh = solar_wh + grid_wh;
 
-  // Custo apenas de daily aggregates
+  // Cost: sum from ALL unified points that have cost_eur (daily data merged in)
+  // Only quadro_principal has cost data
   const cost_eur = unified
     .filter(d => d.cost_eur !== undefined)
     .reduce((sum, d) => sum + (d.cost_eur || 0), 0);
 
-  // Autoconsumo = (solar - exportado) / solar
-  // exported_wh vem do campo 'exported_wh' dos daily aggregates (energia exportada para a rede)
+  // Autoconsumo = (solar - exported) / solar * 100
+  // exported_wh comes from daily aggregate (energia exportada para a rede)
   const exported_wh = unified
     .filter(d => d.exported_wh !== undefined)
     .reduce((sum, d) => sum + (d.exported_wh || 0), 0);
-  
+
   const autoconsumo_pct = solar_wh > 0 
     ? Math.min(100, ((solar_wh - exported_wh) / solar_wh) * 100)
     : 0;
@@ -212,8 +219,9 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
       
       const { hours, days } = getTimeRangeParams(timeRange);
       
-      const fetchHours = timeRange === 'total' ? 8760 : hours;
-      const fetchDays = timeRange === 'total' ? 365 : days;
+      // For total, fetch max; otherwise fetch enough to cover the range + buffer
+      const fetchHours = timeRange === 'total' ? 8760 : Math.min(hours + 48, 8760);
+      const fetchDays = timeRange === 'total' ? 365 : Math.min(days + 7, 365);
 
       const [hourly, daily] = await Promise.all([
         fetchHourlyAggregates(fetchHours),
@@ -235,7 +243,7 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
     return () => clearInterval(interval);
   }, [timeRange]);
 
-  // Filtrar dados conforme range selecionado (para gráficos e totais)
+  // Filter data by selected range (for charts and totals)
   const filteredHourly = useMemo(
     () => filterByRange(hourlyData, timeRange),
     [hourlyData, timeRange]
@@ -245,6 +253,7 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
     [dailyData, timeRange]
   );
 
+  // Unify: merge hourly source with daily cost/export data
   const unifiedData = useMemo(
     () => unifyData(filteredHourly, filteredDaily, timeRange),
     [filteredHourly, filteredDaily, timeRange]
@@ -255,7 +264,7 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
     [unifiedData]
   );
 
-  // Real-time: usa o último registo de TODOS os dados (não filtrados)
+  // Real-time: uses LATEST unfiltered hourly reading
   const realTime = useMemo(
     () => getLatestRealTime(hourlyData),
     [hourlyData]
@@ -275,7 +284,7 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
   };
 }
 
-// Helpers para formatação
+// Formatting helpers
 export function formatEnergy(wh: number): { value: number; unit: string } {
   if (wh >= 1_000_000) return { value: wh / 1_000_000, unit: 'MWh' };
   if (wh >= 1_000) return { value: wh / 1_000, unit: 'kWh' };
