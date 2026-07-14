@@ -39,9 +39,13 @@ function getYAxisTicks(maxValue: number, minValue: number, unit: string): { valu
 
 function parseLabelToDate(label: string): number {
   const formats = [
+    // "Seg 13/07" or "Mon 07/13"
     /^(\w{3})\s+(\d{2})\/(\d{2})$/,
+    // "2024-07-13"
     /^(\d{4})-(\d{2})-(\d{2})$/,
+    // "13/07/2024"
     /^(\d{2})\/(\d{2})\/(\d{4})$/,
+    // "Jul 24" - short month + 2-digit year
     /^(\w{3})\s+(\d{2})$/,
   ];
   
@@ -62,20 +66,21 @@ function parseLabelToDate(label: string): number {
         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).getTime();
       }
       if (regex === formats[3]) {
-              const [, monthStr, yearStr] = match;
-              const monthMap: Record<string, number> = {
-                'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5,
-                'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11,
-                'Feb': 1, 'Apr': 3, 'May': 4, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Dec': 11,
-              };
-              const month = monthMap[monthStr];
-              if (month !== undefined) {
-                const year = parseInt(yearStr) + 2000;
-                return new Date(year, month).getTime();
-              }
-            }
+        const [, monthStr, yearStr] = match;
+        const monthMap: Record<string, number> = {
+          'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5,
+          'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11,
+          'Feb': 1, 'Apr': 3, 'May': 4, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Dec': 11,
+        };
+        const month = monthMap[monthStr];
+        if (month !== undefined) {
+          const year = parseInt(yearStr) + 2000;
+          return new Date(year, month).getTime();
+        }
+      }
     }
   }
+  // Fallback: try parsing as ISO date
   const isoDate = new Date(label).getTime();
   return isNaN(isoDate) ? 0 : isoDate;
 }
@@ -175,10 +180,9 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
 
   const yTicks = getYAxisTicks(maxValue, minValue, 'Wh');
 
-  const allPoints = [...gridPoints, ...solarPoints].sort((a, b) => a.x - b.x);
-
   const showTooltip = hoverIndex !== null && (showGrid || showSolar);
-  const hoveredPoint = showTooltip ? allPoints[hoverIndex] : null;
+  const hoveredGrid = showTooltip ? gridPoints[hoverIndex] : null;
+  const hoveredSolar = showTooltip ? solarPoints[hoverIndex] : null;
 
   return (
     <div className="bg-secondary rounded-xl p-5 shadow-card border border-color">
@@ -198,9 +202,9 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
             if (!svgRef.current) return;
             const rect = svgRef.current.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
-            const closestIndex = allPoints.reduce((closest, point, index) => {
-              const dist = Math.abs(point.x - mouseX);
-              const closestDist = Math.abs(allPoints[closest].x - mouseX);
+            const closestIndex = labels.reduce((closest, _, index) => {
+              const dist = Math.abs(xScale(index) - mouseX);
+              const closestDist = Math.abs(xScale(closest) - mouseX);
               return dist < closestDist ? index : closest;
             }, 0);
             setHoverIndex(closestIndex);
@@ -304,9 +308,9 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
           {/* Hover vertical line */}
           {showTooltip && (
             <line
-              x1={allPoints[hoverIndex!].x}
+              x1={xScale(hoverIndex)}
               y1={padding.top}
-              x2={allPoints[hoverIndex!].x}
+              x2={xScale(hoverIndex)}
               y2={padding.top + chartHeight}
               stroke="var(--chart-text)"
               strokeWidth="1"
@@ -316,47 +320,47 @@ export function CombinedEnergyChart({ gridData, solarData, title, height = 280, 
           )}
           
           {/* Tooltip */}
-          {showTooltip && hoveredPoint && (
-            <g>
-              <foreignObject 
-                x={hoveredPoint.x - 140} 
-                y={hoveredPoint.y - 100} 
-                width={280} 
-                height={100}
-                style={{ pointerEvents: 'none' }}
-              >
-                <div style={{ 
-                  background: 'var(--bg-secondary)', 
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  boxShadow: 'var(--card-shadow)',
-                  fontSize: '13px',
-                  lineHeight: '1.5',
-                }}>
-                  <div style={{ fontWeight: '600', marginBottom: '6px', color: 'var(--text-primary)' }}>
-                    {hoveredPoint.label}
-                  </div>
-                  {hoveredPoint.color === SERIES_COLORS.grid && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '3px 0' }}>
-                      <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.grid }}></span>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Rede</span>
-                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredPoint.value, 'Wh')}</span>
-                    </div>
-                  )}
-                  {hoveredPoint.color === SERIES_COLORS.solar && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '3px 0' }}>
-                      <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.solar }}></span>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Solar</span>
-                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredPoint.value, 'Wh')}</span>
-                    </div>
-                  )}
-                </div>
-              </foreignObject>
-            </g>
-          )}
-        </svg>
+          {showTooltip && (
+                      <g>
+                        <foreignObject 
+                          x={xScale(hoverIndex) - 140} 
+                          y={yScale(Math.max(hoveredGrid?.value || 0, hoveredSolar?.value || 0)) - 100} 
+                          width={280} 
+                          height={100}
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          <div style={{ 
+                            background: 'var(--bg-secondary)', 
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            boxShadow: 'var(--card-shadow)',
+                            fontSize: '13px',
+                            lineHeight: '1.5',
+                          }}>
+                            <div style={{ fontWeight: '600', marginBottom: '6px', color: 'var(--text-primary)' }}>
+                              {labels[hoverIndex]}
+                            </div>
+                            {hoveredGrid && hoveredGrid.hasData && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '3px 0' }}>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.grid }}></span>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Rede</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredGrid.value, 'Wh')}</span>
+                              </div>
+                            )}
+                            {hoveredSolar && hoveredSolar.hasData && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '3px 0' }}>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: SERIES_COLORS.solar }}></span>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Solar</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatValue(hoveredSolar.value, 'Wh')}</span>
+                              </div>
+                            )}
+                          </div>
+                        </foreignObject>
+                      </g>
+                    )}
+                  </svg>
         
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 h-full flex flex-col justify-between pr-2 text-xs text-secondary pointer-events-none" style={{ height: `${height}px` }}>

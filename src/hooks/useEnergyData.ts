@@ -115,11 +115,13 @@ function unifyData(
   const granularity = isHourly ? 'hour' : range === 'total' ? 'month' : 'day';
 
   // Para cost_eur e exported_wh, SEMPRE usar daily aggregates
-  const dailyMap = new Map(daily.map(d => [`${d.device_id}-${d.bucket}`, d]));
+  // Match by DATE (not exact bucket) - daily buckets are YYYY-MM-DD, hourly are YYYY-MM-DDTHH:MM:SS
+  const dailyMap = new Map(daily.map(d => [d.bucket, d]));
 
   return source.map(d => {
-    const dailyKey = `${d.device_id}-${d.bucket}`;
-    const dailyRecord = dailyMap.get(dailyKey);
+    // For hourly data, extract date part to match daily bucket
+    const dateKey = isHourly ? d.bucket.split('T')[0] : d.bucket;
+    const dailyRecord = dailyMap.get(dateKey);
     return {
       bucket: d.bucket,
       device_id: d.device_id,

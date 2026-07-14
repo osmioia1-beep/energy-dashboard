@@ -49,32 +49,36 @@ function getDailyChartData(
   timeRange: TimeRange
 ) {
   const filtered = dailyData.filter(d => d.device_id === deviceId);
-  let sliced: typeof filtered;
+  // Sort by date ascending FIRST
+  const sorted = filtered.sort((a, b) => new Date(a.bucket).getTime() - new Date(b.bucket).getTime());
+  
+  let sliced: typeof sorted;
   let dateFormat: Intl.DateTimeFormatOptions;
   switch (timeRange) {
     case 'today':
     case 'yesterday':
     case '24h':
-      sliced = filtered.slice(0, 1);
+      sliced = sorted.slice(-1); // last day
       dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
       break;
     case '7d':
-      sliced = filtered.slice(0, 7);
+      sliced = sorted.slice(-7);
       dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
       break;
     case '30d':
-      sliced = filtered.slice(0, 30);
+      sliced = sorted.slice(-30);
       dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
       break;
     case 'total':
-      sliced = filtered.slice(0, 365);
+      sliced = sorted.slice(-365);
       dateFormat = { month: 'short', year: '2-digit' };
       break;
     default:
-      sliced = filtered.slice(0, 30);
+      sliced = sorted.slice(-30);
       dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
   }
-  return sliced.reverse().map(d => ({
+  // Return in chronological order (oldest first) for chart
+  return sliced.map(d => ({
     time: new Date(d.bucket).toLocaleDateString('pt-PT', dateFormat),
     value: d.energy_wh || 0,
     label: new Date(d.bucket).toLocaleDateString('pt-PT', dateFormat),
