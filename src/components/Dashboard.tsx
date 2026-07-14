@@ -430,8 +430,6 @@ export function Dashboard() {
   const gridPower = latestGrid?.avg_power_w || 0;
   const solarPower = latestSolar?.avg_power_w || 0;
   const housePower = gridPower + solarPower;
-  const exportPower = gridPower < 0 ? Math.abs(gridPower) : 0;
-  const importPower = gridPower > 0 ? gridPower : 0;
 
   const isHourlyView = timeRange === 'today' || timeRange === 'yesterday' || timeRange === '24h';
   const chartConfig = getChartConfig(timeRange, isHourlyView);
@@ -511,68 +509,67 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Power Cards Grid - Real Time */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <PowerCard
-          label="Produção Solar"
-          value={solarPower}
-          unit="W"
-          color="text-amber-500"
-          icon="☀️"
-        />
-        <PowerCard
-          label="Rede Elétrica"
-          value={gridPower}
-          unit="W"
-          color={gridPower < 0 ? 'text-green-500' : 'text-orange-500'}
-          icon="⚡"
-        />
-        <PowerCard
-          label="Consumo Casa"
-          value={housePower}
-          unit="W"
-          color="text-red-500"
-          icon="🏠"
-        />
-        <PowerCard
-          label={exportPower > 0 ? 'Exportando' : 'Importando'}
-          value={exportPower > 0 ? exportPower : importPower}
-          unit="W"
-          color={exportPower > 0 ? 'text-green-500' : 'text-orange-500'}
-          icon={exportPower > 0 ? '📤' : '📥'}
-        />
+      {/* Power Cards Grid - Tempo Real */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-secondary uppercase tracking-wide">Tempo Real</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <PowerCard
+            label="Produção Solar"
+            value={solarPower}
+            unit="W"
+            color="text-amber-500"
+            icon="☀️"
+          />
+          <PowerCard
+            label="Rede Elétrica"
+            value={gridPower}
+            unit="W"
+            color={gridPower < 0 ? 'text-green-500' : 'text-orange-500'}
+            icon="⚡"
+          />
+          <PowerCard
+            label="Consumo Casa"
+            value={housePower}
+            unit="W"
+            color="text-red-500"
+            icon="🏠"
+          />
+        </div>
       </div>
 
-      {/* Period Total Cards - Dynamic based on timeRange */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <PowerCard
-          label={`Solar (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
-          value={totals.solar_wh}
-          unit="Wh"
-          color="text-amber-500"
-          icon="☀️"
-        />
-        <PowerCard
-          label={`Rede (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
-          value={totals.grid_wh}
-          unit="Wh"
-          color="text-blue-500"
-          icon="⚡"
-        />
-        <PowerCard
-          label={`Custo (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
-          value={totals.cost_eur}
-          unit="€"
-          color="text-orange-500"
-          icon="💰"
-        />
-        <PowerCard
-          label={`Autoconsumo (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
-          value={totals.autoconsumo_pct}
-          unit="%"
-          color="text-green-500"
-          icon="♻️"
-        />
+      {/* Period Total Cards - Totais do Período */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-secondary uppercase tracking-wide">Totais do Período</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <PowerCard
+            label={`Solar (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+            value={totals.solar_wh}
+            unit="Wh"
+            color="text-amber-500"
+            icon="☀️"
+          />
+          <PowerCard
+            label={`Rede (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+            value={totals.grid_wh}
+            unit="Wh"
+            color="text-blue-500"
+            icon="⚡"
+          />
+          <PowerCard
+            label={`Custo (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+            value={totals.cost_eur}
+            unit="€"
+            color="text-orange-500"
+            icon="💰"
+          />
+          <PowerCard
+            label={`Autoconsumo (${TIME_RANGES.find(r => r.value === timeRange)?.label})`}
+            value={totals.autoconsumo_pct}
+            unit="%"
+            color="text-green-500"
+            icon="♻️"
+          />
+        </div>
       </div>
 
       {/* Charts - Combined Grid + Solar */}

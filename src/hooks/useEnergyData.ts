@@ -29,11 +29,20 @@ export interface AggregatedTotals {
   autoconsumo_pct: number;
 }
 
+export interface RealTimeData {
+  solarPower: number;
+  gridPower: number;
+  housePower: number;
+  exportPower: number;
+  importPower: number;
+}
+
 interface UseEnergyDataResult {
   hourlyData: HourlyAggregate[];
   dailyData: DailyAggregate[];
   unifiedData: UnifiedDataPoint[];
   totals: AggregatedTotals;
+  realTime: RealTimeData;
   loading: boolean;
   error: string | null;
   timeRange: TimeRange;
@@ -141,6 +150,7 @@ function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
     .reduce((sum, d) => sum + (d.cost_eur || 0), 0);
 
   // Autoconsumo = (solar - exportado) / solar
+  // exported_wh vem do campo 'exported_wh' dos daily aggregates (energia exportada para a rede)
   const exported_wh = unified
     .filter(d => d.exported_wh !== undefined)
     .reduce((sum, d) => sum + (d.exported_wh || 0), 0);
@@ -157,6 +167,25 @@ function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
     import_wh,
     cost_eur,
     autoconsumo_pct,
+  };
+}
+
+function getLatestRealTime(hourly: HourlyAggregate[]): RealTimeData {
+  const latestGrid = hourly.find(d => d.device_id === 'quadro_principal');
+  const latestSolar = hourly.find(d => d.device_id === 'inversor');
+
+  const gridPower = latestGrid?.avg_power_w || 0;
+  const solarPower = latestSolar?.avg_power_w || 0;
+  const housePower = gridPower + solarPower;
+  const exportPower = gridPower < 0 ? Math.abs(gridPower) : 0;
+  const importPower = gridPower > 0 ? gridPower : 0;
+
+  return {
+    solarPower,
+    gridPower,
+    housePower,
+    exportPower,
+    importPower,
   };
 }
 
@@ -197,7 +226,7 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
     return () => clearInterval(interval);
   }, [timeRange]);
 
-  // Filtrar dados conforme range selecionado
+  // Filtrar dados conforme range selecionado (para gráficos e totais)
   const filteredHourly = useMemo(
     () => filterByRange(hourlyData, timeRange),
     [hourlyData, timeRange]
@@ -217,11 +246,18 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
     [unifiedData]
   );
 
+  // Real-time: usa o último registo de TODOS os dados (não filtrados)
+  const realTime = useMemo(
+    () => getLatestRealTime(hourlyData),
+    [hourlyData]
+  );
+
   return {
     hourlyData: filteredHourly,
     dailyData: filteredDaily,
     unifiedData,
     totals,
+    realTime,
     loading,
     error,
     timeRange,
