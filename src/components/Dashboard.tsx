@@ -5,21 +5,17 @@ import { CombinedEnergyChart } from './CombinedEnergyChart';
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: 'today', label: 'Hoje' },
   { value: 'yesterday', label: 'Ontem' },
-  { value: '24h', label: '24h' },
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
   { value: 'total', label: 'Total' },
 ];
 
-function getChartConfig(timeRange: TimeRange, isHourlyView: boolean) {
-  if (isHourlyView) {
-    return {
-      title: timeRange === 'today' ? 'Energia (Hoje)' : timeRange === 'yesterday' ? 'Energia (Ontem)' : 'Energia (Últimas 24h)',
-      periodTitle: timeRange === 'today' ? 'Hoje' : timeRange === 'yesterday' ? 'Ontem' : 'Últimas 24h',
-      maxPoints: 24,
-    };
-  }
+function getChartConfig(timeRange: TimeRange) {
   switch (timeRange) {
+    case 'today':
+      return { title: 'Energia (Hoje)', periodTitle: 'Hoje', maxPoints: 1 };
+    case 'yesterday':
+      return { title: 'Energia (Ontem)', periodTitle: 'Ontem', maxPoints: 1 };
     case '7d':
       return { title: 'Energia (7 dias)', periodTitle: 'Últimos 7 dias', maxPoints: 7 };
     case '30d':
@@ -35,7 +31,6 @@ function getSummaryTitle(timeRange: TimeRange): string {
   const labels: Record<TimeRange, string> = {
     today: 'Hoje',
     yesterday: 'Ontem',
-    '24h': 'Últimas 24h',
     '7d': 'Últimos 7 dias',
     '30d': 'Últimos 30 dias',
     total: 'Todo o histórico',
@@ -57,7 +52,6 @@ function getDailyChartData(
   switch (timeRange) {
     case 'today':
     case 'yesterday':
-    case '24h':
       sliced = sorted.slice(-1); // last day
       dateFormat = { weekday: 'short', day: '2-digit', month: '2-digit' };
       break;
@@ -86,50 +80,8 @@ function getDailyChartData(
   }));
 }
 
-function getHourlyChartData(
-  hourlyData: { device_id: string; bucket: string; energy_wh: number | null; avg_power_w: number | null }[],
-  deviceId: string,
-  timeRange: TimeRange
-) {
-  const filtered = hourlyData.filter(d => d.device_id === deviceId);
-  // Sort by bucket ascending (oldest first)
-  const sorted = filtered.sort((a, b) => new Date(a.bucket).getTime() - new Date(b.bucket).getTime());
-  
-  let sliced: typeof sorted;
-  let timeFormat: Intl.DateTimeFormatOptions;
-  
-  switch (timeRange) {
-    case 'today':
-      // Today: from midnight to now (or last available hour)
-      sliced = sorted.slice(-24); // last 24 hours, but today only has hours from 00:00
-      timeFormat = { hour: '2-digit', minute: '2-digit' };
-      break;
-    case 'yesterday':
-      // Yesterday: full 24h
-      sliced = sorted.slice(-24);
-      timeFormat = { hour: '2-digit', minute: '2-digit' };
-      break;
-    case '24h':
-      // Last 24 hours: from current hour yesterday to current hour today
-      sliced = sorted.slice(-24);
-      timeFormat = { hour: '2-digit', minute: '2-digit' };
-      break;
-    default:
-      sliced = sorted.slice(-24);
-      timeFormat = { hour: '2-digit', minute: '2-digit' };
-  }
-  
-  return sliced.map(d => ({
-    time: new Date(d.bucket).toLocaleTimeString('pt-PT', timeFormat),
-    value: d.energy_wh || 0,
-    label: new Date(d.bucket).toLocaleTimeString('pt-PT', { hour: '2-digit' }),
-    bucket: d.bucket, // preserve for sorting
-  }));
-}
-
 export function Dashboard() {
   const {
-    hourlyData,
     dailyData,
     totals,
     realTime,
@@ -138,25 +90,19 @@ export function Dashboard() {
     timeRange,
     setTimeRange,
     refetch,
-  } = useEnergyData('24h');
+  } = useEnergyData('7d');
 
   // Tempo Real: usa o objeto realTime do hook (dados não filtrados)
   const { solarPower, gridPower, housePower } = realTime;
 
-  const isHourlyView = timeRange === 'today' || timeRange === 'yesterday' || timeRange === '24h';
-  const chartConfig = getChartConfig(timeRange, isHourlyView);
+  const chartConfig = getChartConfig(timeRange);
   const summaryTitle = getSummaryTitle(timeRange);
 
-  // Chart data preparation
-  const gridChartData = isHourlyView
-    ? getHourlyChartData(hourlyData, 'quadro_principal', timeRange)
-    : getDailyChartData(dailyData, 'quadro_principal', timeRange);
+  // Chart data preparation - apenas dados diários (Daily_Aggregates)
+  const gridChartData = getDailyChartData(dailyData, 'quadro_principal', timeRange);
+  const solarChartData = getDailyChartData(dailyData, 'inversor', timeRange);
 
-  const solarChartData = isHourlyView
-    ? getHourlyChartData(hourlyData, 'inversor', timeRange)
-    : getDailyChartData(dailyData, 'inversor', timeRange);
-
-  if (loading && !hourlyData.length) {
+  if (loading && !dailyData.length) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>

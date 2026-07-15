@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-  fetchHourlyAggregates, 
   fetchDailyAggregates, 
-  type HourlyAggregate, 
   type DailyAggregate 
 } from '../lib/supabase';
 
-export type TimeRange = 'today' | 'yesterday' | '24h' | '7d' | '30d' | 'total';
+export type TimeRange = 'today' | 'yesterday' | '7d' | '30d' | 'total';
 
 export interface UnifiedDataPoint {
   bucket: string;
@@ -16,7 +14,7 @@ export interface UnifiedDataPoint {
   max_power_w: number;
   cost_eur?: number;
   exported_wh?: number;
-  granularity: 'hour' | 'day' | 'month';
+  granularity: 'day' | 'month';
 }
 
 export interface AggregatedTotals {
@@ -38,7 +36,6 @@ export interface RealTimeData {
 }
 
 interface UseEnergyDataResult {
-  hourlyData: HourlyAggregate[];
   dailyData: DailyAggregate[];
   unifiedData: UnifiedDataPoint[];
   totals: AggregatedTotals;
@@ -50,14 +47,13 @@ interface UseEnergyDataResult {
   refetch: () => Promise<void>;
 }
 
-function getTimeRangeParams(range: TimeRange): { hours: number; days: number } {
+function getTimeRangeParams(range: TimeRange): { days: number } {
   switch (range) {
-    case 'today': return { hours: 24, days: 1 };
-    case 'yesterday': return { hours: 48, days: 2 };
-    case '24h': return { hours: 24, days: 1 };
-    case '7d': return { hours: 168, days: 7 };
-    case '30d': return { hours: 720, days: 30 };
-    case 'total': return { hours: 8760, days: 365 };
+    case 'today': return { days: 1 };
+    case 'yesterday': return { days: 2 };
+    case '7d': return { days: 7 };
+    case '30d': return { days: 30 };
+    case 'total': return { days: 365 };
   }
 }
 
@@ -73,11 +69,6 @@ function getDateRange(range: TimeRange): { start: Date; end: Date } {
     case 'yesterday': {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
-      return { start, end };
-    }
-    case '24h': {
-      const end = new Date(now);
-      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       return { start, end };
     }
     case '7d': {
@@ -107,38 +98,21 @@ function filterByRange<T extends { bucket: string }>(data: T[], range: TimeRange
 }
 
 function unifyData(
-  hourly: HourlyAggregate[], 
-  daily: DailyAggregate[], 
+  daily: DailyAggregate[],
   range: TimeRange
 ): UnifiedDataPoint[] {
-  const isHourly = range === 'today' || range === 'yesterday' || range === '24h';
-  const source = isHourly ? hourly : daily;
-  const granularity = isHourly ? 'hour' : range === 'total' ? 'month' : 'day';
+  const granularity = range === 'total' ? 'month' : 'day';
 
-  // Build daily lookup by DATE (YYYY-MM-DD) from ALL daily data (not filtered)
-  // This ensures we have cost/export data even for edge hours
-  const dailyMap = new Map<string, DailyAggregate>();
-  daily.forEach(d => {
-    const dateKey = d.bucket.split('T')[0]; // Ensure we use date part only
-    dailyMap.set(dateKey, d);
-  });
-
-  return source.map(d => {
-    // For hourly data, extract date part to match daily bucket
-    const dateKey = isHourly ? d.bucket.split('T')[0] : d.bucket.split('T')[0];
-    const dailyRecord = dailyMap.get(dateKey);
-    
-    return {
-      bucket: d.bucket,
-      device_id: d.device_id,
-      energy_wh: d.energy_wh || 0,
-      avg_power_w: d.avg_power_w || 0,
-      max_power_w: d.max_power_w || 0,
-      cost_eur: dailyRecord?.cost_eur ?? undefined,
-      exported_wh: dailyRecord?.exported_wh ?? undefined,
-      granularity,
-    };
-  });
+  return daily.map(d => ({
+    bucket: d.bucket,
+    device_id: d.device_id,
+    energy_wh: d.energy_wh || 0,
+    avg_power_w: d.avg_power_w || 0,
+    max_power_w: d.max_power_w || 0,
+    cost_eur: d.cost_eur ?? undefined,
+    exported_wh: d.exported_wh ?? undefined,
+    granularity,
+  }));
 }
 
 function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
@@ -171,7 +145,7 @@ function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
     .filter(d => d.exported_wh !== undefined)
     .reduce((sum, d) => sum + (d.exported_wh || 0), 0);
 
-  const autoconsumo_pct = solar_wh > 0 
+  const autoconsumo_pct = solar_wh > 0
     ? Math.min(100, ((solar_wh - exported_wh) / solar_wh) * 100)
     : 0;
 
@@ -186,9 +160,15 @@ function calculateTotals(unified: UnifiedDataPoint[]): AggregatedTotals {
   };
 }
 
-function getLatestRealTime(hourly: HourlyAggregate[]): RealTimeData {
-  const latestGrid = hourly.find(d => d.device_id === 'quadro_principal');
-  const latestSolar = hourly.find(d => d.device_id === 'inversor');
+function getLatestRealTime(daily: DailyAggregate[]): RealTimeData {
+  // Para tempo real, usamos os dados mais recentes disponíveis do daily_aggregates
+  // Pegamos o último registro de cada dispositivo
+  const latestGrid = daily
+    .filter(d => d.device_id === 'quadro_principal')
+    .sort((a, b) => new Date(b.bucket).getTime() - new Date(a.bucket).getTime())[0];
+  const latestSolar = daily
+    .filter(d => d.device_id === 'inversor')
+    .sort((a, b) => new Date(b.bucket).getTime() - new Date(a.bucket).getTime())[0];
 
   const gridPower = latestGrid?.avg_power_w || 0;
   const solarPower = latestSolar?.avg_power_w || 0;
@@ -205,8 +185,7 @@ function getLatestRealTime(hourly: HourlyAggregate[]): RealTimeData {
   };
 }
 
-export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataResult {
-  const [hourlyData, setHourlyData] = useState<HourlyAggregate[]>([]);
+export function useEnergyData(initialRange: TimeRange = '7d'): UseEnergyDataResult {
   const [dailyData, setDailyData] = useState<DailyAggregate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -217,18 +196,13 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
       setLoading(true);
       setError(null);
       
-      const { hours, days } = getTimeRangeParams(timeRange);
+      const { days } = getTimeRangeParams(timeRange);
       
-      // For total, fetch max; otherwise fetch enough to cover the range + buffer
-      const fetchHours = timeRange === 'total' ? 8760 : Math.min(hours + 48, 8760);
+      // Fetch enough daily data to cover the range + buffer
       const fetchDays = timeRange === 'total' ? 365 : Math.min(days + 7, 365);
 
-      const [hourly, daily] = await Promise.all([
-        fetchHourlyAggregates(fetchHours),
-        fetchDailyAggregates(fetchDays),
-      ]);
+      const daily = await fetchDailyAggregates(fetchDays);
 
-      setHourlyData(hourly);
       setDailyData(daily);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
@@ -244,19 +218,15 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
   }, [timeRange]);
 
   // Filter data by selected range (for charts and totals)
-  const filteredHourly = useMemo(
-    () => filterByRange(hourlyData, timeRange),
-    [hourlyData, timeRange]
-  );
   const filteredDaily = useMemo(
     () => filterByRange(dailyData, timeRange),
     [dailyData, timeRange]
   );
 
-  // Unify: merge hourly source with daily cost/export data
+  // Unify: merge daily source with daily cost/export data
   const unifiedData = useMemo(
-    () => unifyData(filteredHourly, filteredDaily, timeRange),
-    [filteredHourly, filteredDaily, timeRange]
+    () => unifyData(filteredDaily, timeRange),
+    [filteredDaily, timeRange]
   );
 
   const totals = useMemo(
@@ -264,14 +234,13 @@ export function useEnergyData(initialRange: TimeRange = '24h'): UseEnergyDataRes
     [unifiedData]
   );
 
-  // Real-time: uses LATEST unfiltered hourly reading
+  // Real-time: uses LATEST unfiltered daily reading
   const realTime = useMemo(
-    () => getLatestRealTime(hourlyData),
-    [hourlyData]
+    () => getLatestRealTime(dailyData),
+    [dailyData]
   );
 
   return {
-    hourlyData: filteredHourly,
     dailyData: filteredDaily,
     unifiedData,
     totals,
